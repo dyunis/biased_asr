@@ -1,5 +1,4 @@
 import os
-import time
 import argparse
 
 import numpy as np
@@ -9,6 +8,7 @@ import tqdm
 import dataset
 import decoder
 import utils
+import models
 
 # TODO:
 # check training results in working recognizer
@@ -30,54 +30,6 @@ def main(args):
     utils.safe_copytree(datadir, tmpdir)
     train(tmpdir, jsons, tok_file)
     utils.safe_rmtree(tmpdir)
-
-class LSTM(torch.nn.Module):
-#     51 magic number comes from 50 characters plus blank
-    def __init__(self, input_dim=40, hidden_dim=512, out_dim=51, num_layers=1, 
-                 bias=False, bidirectional=True):
-        super(LSTM, self).__init__()
-        self.lstm = torch.nn.LSTM(input_size=input_dim, hidden_size=hidden_dim, 
-                                  num_layers=num_layers, bias=bias, 
-                                  bidirectional=bidirectional)
-        self.num_layers = num_layers
-        self.num_dirs = int(bidirectional) + 1
-        self.hidden_dim = hidden_dim
-        self.out_dim = out_dim
-        self.linear = torch.nn.Linear(self.num_dirs*self.hidden_dim, 
-                                      self.out_dim)
-        self.classifier = torch.nn.LogSoftmax(dim=-1)
-
-    def forward(self, X):
-        '''
-        X: (batch, seq_len, F) 
-        y: (batch, seq_len, V)
-        '''
-        # re-init hidden so that changing batch size isn't a problem
-        h0 = self.init_hidden(len(X))
-        y, self.hidden = self.lstm(X.transpose(0, 1), h0)
-#         else:
-#             hidden = self.repackage_hidden(self.hidden)
-#             y, self.hidden = self.lstm(X.transpose(0, 1), hidden) 
-
-        y = self.linear(y).transpose(0, 1)
-        y = self.classifier(y)
-        return y
-
-    def init_hidden(self, batch_size):
-        weight = next(self.parameters())
-        return (weight.new_zeros(self.num_layers*self.num_dirs, batch_size, self.hidden_dim),
-                weight.new_zeros(self.num_layers*self.num_dirs, batch_size, self.hidden_dim))
-
-    # TODO: implement truncated BPTT by repackaging every k steps
-    def repackage_hidden(self, hidden):
-        '''
-        from https://github.com/pytorch/examples/blob/master/word_language_model/main.py 
-        Wraps hidden states in new Tensors, to detach them from their history.
-        '''
-        if isinstance(hidden, torch.Tensor):
-            return hidden.detach()
-        else:
-            return tuple(self.repackage_hidden(v) for v in hidden)
 
 def train(datadir, jsons, tok_file):
     bsize = 16
@@ -109,7 +61,7 @@ def train(datadir, jsons, tok_file):
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-    model = LSTM(num_layers=3)
+    model = models.LSTM(num_layers=3)
     ctc_loss = torch.nn.CTCLoss(blank=0, reduction='mean', zero_infinity=True)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, betas=(0.9, 0.98))
     model.to(device)
@@ -163,7 +115,7 @@ def train(datadir, jsons, tok_file):
 
 # TODO: look at shubham's paper and kaldi 4-gram for language model integration
 def recognize(args, datadir, jsons):
-    model = LSTM(args)
+    model = models.LSTM(args)
     model.load_state_dict(torch.load(model_dir))
     model.eval()
 
