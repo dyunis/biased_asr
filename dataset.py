@@ -6,63 +6,10 @@ import numpy as np
 import kaldiio # kaldiio is faster at reading than kaldi_io
 import tqdm
 
-'''
-PyTorch CTC has some specific requirements, we need int32 for CuDNN backend,
-also target_lengths \leq 256, see 
-https://pytorch.org/docs/stable/nn.html#ctcloss
-'''
-
-# TODO: test read/write speeds with hdf5 and json and reading in the whole kaldi
-# ark on /scratch
-
-def bucket_dataset(utt_ids, feat_lens, num_buckets):
-    '''
-    returns a dictionary mapping bucket idx to a list of utterances and a 
-    map from utterance id to bucket idx
-
-    based on ESPnet json
-    '''
-    
-    buckets = {}
-    utt2bucket = {}
-    utt_and_len = []
-    for utt_id in utt_ids:
-        utt_and_len.append((utt_id, feat_lens[utt_id]))
-    
-    # sort the utterances according to length
-    utt_and_len = sorted(utt_and_len, key=lambda tupl: tupl[1])
-    utts = [tupl[0] for tupl in utt_and_len] 
-
-    # divide the utterances into buckets
-    per_bucket = len(utts) // num_buckets
-    for i in range(num_buckets):
-        buckets[i] = utts[i * per_bucket:(i + 1) * per_bucket]
-    
-        for utt in buckets[i]:
-            utt2bucket[utt] = i
-
-    # add the remainder to the last bucket
-    if num_buckets * per_bucket < len(utts):
-        buckets[num_buckets - 1] = buckets[num_buckets - 1] + utts[num_buckets * per_bucket:]
-
-    return buckets, utt2bucket
-
-def save_buckets(buckets, savedir):
-    if not os.path.exists(savedir):
-        os.makedirs(savedir)
-        
-    for i in buckets.keys():
-        fname = os.path.join(savedir, f'bucket_{i}')
-        with open(fname, 'w') as f:
-            for utt in buckets[i]:
-                f.write(utt + '\n')
-
-
 class ESPnetDataset(torch.utils.data.Dataset):
     '''
     a torch dataset reorganizing the json that ESPnet spits out
     '''
-
     def __init__(self, json_file, tok_file, transform=None):
         self.json_file = json_file
         with open(json_file, 'r') as f:
@@ -109,6 +56,47 @@ class ESPnetBucketDataset(ESPnetDataset):
                                                        num_buckets)
         self.num_buckets = num_buckets
 
+def bucket_dataset(utt_ids, feat_lens, num_buckets):
+    '''
+    returns a dictionary mapping bucket idx to a list of utterances and a 
+    map from utterance id to bucket idx
+
+    based on ESPnet json
+    '''
+    buckets = {}
+    utt2bucket = {}
+    utt_and_len = []
+    for utt_id in utt_ids:
+        utt_and_len.append((utt_id, feat_lens[utt_id]))
+    
+    # sort the utterances according to length
+    utt_and_len = sorted(utt_and_len, key=lambda tupl: tupl[1])
+    utts = [tupl[0] for tupl in utt_and_len] 
+
+    # divide the utterances into buckets
+    per_bucket = len(utts) // num_buckets
+    for i in range(num_buckets):
+        buckets[i] = utts[i * per_bucket:(i + 1) * per_bucket]
+    
+        for utt in buckets[i]:
+            utt2bucket[utt] = i
+
+    # add the remainder to the last bucket
+    if num_buckets * per_bucket < len(utts):
+        buckets[num_buckets - 1] = buckets[num_buckets - 1] + utts[num_buckets * per_bucket:]
+
+    return buckets, utt2bucket
+
+def save_buckets(buckets, savedir):
+    if not os.path.exists(savedir):
+        os.makedirs(savedir)
+        
+    for i in buckets.keys():
+        fname = os.path.join(savedir, f'bucket_{i}')
+        with open(fname, 'w') as f:
+            for utt in buckets[i]:
+                f.write(utt + '\n')
+
 class BucketBatchSampler(torch.utils.data.Sampler):
     '''
     returns a list of indices to be sampled, whenever possible, we want to 
@@ -124,7 +112,6 @@ class BucketBatchSampler(torch.utils.data.Sampler):
 
     permute all the indices in all buckets
     '''
-    
     def __init__(self, shuffle, batch_size, utt2idx, buckets, seed=0):
         self.batch_size = batch_size
         self.shuffle = shuffle
@@ -168,12 +155,10 @@ class BucketBatchSampler(torch.utils.data.Sampler):
     def __len__(self):
         return len(self.bucket_list)
 
-# pad_sequence taken from espnet demo
-# from PyTorch source: 
-# https://pytorch.cn/docs/master/_modules/torch/nn/utils/rnn.html
-# "stacks a list of Tensors along a new dimension, and pads them to equal 
-# length."
 def collate(minibatch):
+    '''
+    stacks the features then pads them to equal length
+    '''
     idx2utt, feats, labels = [], [], []
     for i in range(len(minibatch)):
         idx2utt.append(minibatch[i]['utt_id'])
@@ -185,13 +170,6 @@ def collate(minibatch):
     batch['feat_lens'] = torch.tensor([feat.shape[0] for feat in feats], dtype=torch.int32)
     batch['label'] = torch.nn.utils.rnn.pad_sequence(labels, batch_first=True)
     batch['label_lens'] = torch.tensor([label.shape[0] for label in labels], dtype=torch.int32)
-    return batch
-
-# truncated backprop through time
-def get_bptt_batches(minibatch, bptt=1):
-    '''Truncates sequence length to bptt entries long'''
-    seq_len = min(bptt, len(minibatch))
-    batch = None
     return batch
 
 if __name__=='__main__':
