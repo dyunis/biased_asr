@@ -11,7 +11,6 @@ import utils
 import models
 
 # TODO:
-# check training results in working recognizer
 # WER evaluation
 # beam search decoding
 # integrate arpa language models

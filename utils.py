@@ -28,7 +28,9 @@ def debug(function):
 def lineinfo(function):
     @functools.wraps(function)
     def wrapped(*args, **kwargs):
-        print(f'filename: {inspect.stack()[1][1]}', f'line number: {inspect.stack()[1][2]}', f'function name: {function.__name__}') 
+        print(f'filename: {inspect.stack()[1][1]}',
+              f'line number: {inspect.stack()[1][2]}',
+              f'function name: {function.__name__}') 
         return function(*args, **kwargs)
     return wrapped
 
