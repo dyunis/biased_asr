@@ -28,7 +28,7 @@ def main(args):
     tok_file = 'lang_1char/train_si284_units.txt'
     utils.safe_copytree(datadir, tmpdir)
     train(tmpdir, jsons, tok_file)
-    utils.safe_rmtree(tmpdir)
+#     utils.safe_rmtree(tmpdir)
 
 def train(datadir, jsons, tok_file):
     bsize = 16

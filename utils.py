@@ -1,5 +1,6 @@
 import os
 import shutil
+import logging
 import functools
 import time
 import inspect
@@ -36,7 +37,8 @@ def lineinfo(function):
 
 def safe_copytree(src, tgt):
     if not os.path.exists(src):
-        raise OSError(f'Path to remove {tgt} does not exist')
+        print(f'Path to copy {src} does not exist')
+        return
 
     if os.path.exists(tgt):
         print(f'Target directory {tgt} already exists')
@@ -55,7 +57,8 @@ def safe_copytree(src, tgt):
 
 def safe_rmtree(tgt):
     if not os.path.exists(tgt):
-        raise OSError(f'Path to remove {tgt} does not exist')
+        print(f'Path to remove {tgt} does not exist')
+        return
 
     shutil.rmtree(tgt)
 
