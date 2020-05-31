@@ -30,16 +30,14 @@ def main(args):
     train(tmpdir, jsons, tok_file)
 #     utils.safe_rmtree(tmpdir)
 
-def train(datadir, jsons, tok_file):
+def train(datadir, jsons, tok_file, bucket_load_dir=None, bucket_save_dir=None):
     bsize = 16
 
     train_set = dataset.ESPnetBucketDataset(os.path.join(datadir, jsons['train']),
                                             os.path.join(datadir, tok_file),
-                                            bucket_dir='/scratch/asr_tmp/buckets',
                                             num_buckets=10)
     dev_set = dataset.ESPnetBucketDataset(os.path.join(datadir, jsons['val']),
                                           os.path.join(datadir, tok_file),
-                                          bucket_dir='/scratch/asr_tmp/buckets',
                                           num_buckets=10)
     bucket_train_loader = torch.utils.data.DataLoader(
                             train_set, 

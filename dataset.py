@@ -46,14 +46,21 @@ class ESPnetBucketDataset(ESPnetDataset):
     '''
     a torch dataset using a version of the dataset bucketed by length
     '''
-    def __init__(self, json_file, tok_file, bucket_dir, num_buckets, 
-                 transform=None):
+    def __init__(self, json_file, tok_file, load_dir=None, save_dir=None, 
+                 num_buckets=10, transform=None):
         super().__init__(json_file, tok_file, transform)
         utt_ids = self.json.keys()
         feat_lens = {utt_id: self.json[utt_id]['input'][0]['shape'][0] for utt_id in utt_ids}
-        self.buckets, self.utt2bucket = bucket_dataset(utt_ids, 
-                                                       feat_lens,
-                                                       num_buckets)
+
+        if load_dir is not None:
+            self.buckets, self.utt2bucket = load_buckets(load_dir, num_buckets)
+        else:
+            self.buckets, self.utt2bucket = bucket_dataset(utt_ids, 
+                                                           feat_lens,
+                                                           num_buckets)
+            if save_dir is not None:
+                save_buckets(save_dir, self.buckets)
+
         self.num_buckets = num_buckets
 
 def bucket_dataset(utt_ids, feat_lens, num_buckets):
@@ -87,15 +94,33 @@ def bucket_dataset(utt_ids, feat_lens, num_buckets):
 
     return buckets, utt2bucket
 
-def save_buckets(buckets, savedir):
-    if not os.path.exists(savedir):
-        os.makedirs(savedir)
+def save_buckets(bucket_dir, buckets):
+    if not os.path.exists(bucket_dir):
+        os.makedirs(bucket_dir)
         
     for i in buckets.keys():
-        fname = os.path.join(savedir, f'bucket_{i}')
+        fname = os.path.join(bucket_dir, str(i))
         with open(fname, 'w') as f:
             for utt in buckets[i]:
                 f.write(utt + '\n')
+
+def load_buckets(bucket_dir, num_buckets):
+    if not os.path.exists(bucket_dir):
+        raise OSError(f'Path to load {bucket_dir} does not exist')
+
+    buckets = {} 
+    utt2bucket = {}
+
+    for i in range(num_buckets):
+        buckets[i] = []
+        bucket_file = os.path.join(bucket_dir, str(i))
+        with open(bucket_file, 'r') as f:
+            for line in f:
+                utt = line.strip()
+                buckets[i].append(utt)
+                utt2bucket[utt] = i
+
+    return buckets, utt2bucket
 
 class BucketBatchSampler(torch.utils.data.Sampler):
     '''
