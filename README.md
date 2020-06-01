@@ -17,10 +17,14 @@
 
 ### Dataset
 my treated copy of WSJ is located at `/share/data/speech/Data/dyunis/data/wsj_espnet`,
-copy to scratch before starting training (this should be in the training code 
+copy to scratch before starting training (this is done in the training code 
 already with `safe_cptree`)
 
 see `main()` in `train.py` for more path info
+
+the balanced and imbalanced datasets are inside the WSJ directory at 
+`5050_buckets`, `8020_buckets` and `2080_buckets`, where the first number is 
+the proportion of female speakers, and the second is the proportion of male
 
 ### TODO:
 - David:
