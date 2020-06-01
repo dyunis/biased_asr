@@ -55,19 +55,17 @@ def compute_words(char_idxs, idx2char, space_idx=18, to_remove=-1):
 
 def levenshtein(pred, label):
     d = np.zeros((len(pred) + 1, len(label) + 1), dtype=np.int)
-    for i in range(len(pred) + 1):
+    for i in range(1, d.shape[0]):
         d[i, 0] = i
 
-    for j in range(len(label) + 1):
+    for j in range(1, d.shape[1]):
         d[0, j] = j
 
     for i in range(1, d.shape[0]):
         for j in range(1, d.shape[1]):
             insert = d[i - 1, j] + 1
             delete = d[i, j - 1] + 1
-            sub = d[i - 1, j - 1]
-            if pred[i] != label[j]:
-                sub += 1
+            sub = d[i - 1, j - 1] + int(pred[i - 1] != label[j - 1])
 
             d[i, j] = min(delete, insert, sub)
 
@@ -91,4 +89,8 @@ if __name__=='__main__':
     a = np.array([[1, 2, 3], [1, 2, 3], [1, 2, 3]])
     a = a[None, ...]
     print(batch_greedy_ctc_decode(a))
+
+    pred = ['o', 'this', 'this']
+    label = ['this', 'is']
+    print(levenshtein(pred, label))
     
