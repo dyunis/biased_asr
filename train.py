@@ -9,6 +9,7 @@ import dataset
 import decoder
 import utils
 import models
+import gender_subset
 
 # TODO:
 # WER evaluation
@@ -26,19 +27,29 @@ def main(args):
              'val': 'dump/test_dev93/deltafalse/data.json',
              'test': 'dump/test_eval92/deltafalse/data.json'}
     tok_file = 'lang_1char/train_si284_units.txt'
+    spk2gender_file = 'train_si284/spk2gender'
+    bucket_load_dir = '5050_buckets'
     utils.safe_copytree(datadir, tmpdir)
-    train(tmpdir, jsons, tok_file)
+    train(tmpdir, jsons, tok_file, spk2gender_file, 
+          bucket_load_dir=bucket_load_dir)
 #     utils.safe_rmtree(tmpdir)
 
-def train(datadir, jsons, tok_file, bucket_load_dir=None, bucket_save_dir=None):
+def train(datadir, jsons, tok_file, spk2gender_file, bucket_load_dir=None, 
+          bucket_save_dir=None):
     bsize = 16
 
-    train_set = dataset.ESPnetBucketDataset(os.path.join(datadir, jsons['train']),
-                                            os.path.join(datadir, tok_file),
-                                            num_buckets=10)
-    dev_set = dataset.ESPnetBucketDataset(os.path.join(datadir, jsons['val']),
-                                          os.path.join(datadir, tok_file),
-                                          num_buckets=10)
+    train_set = gender_subset.ESPnetGenderBucketDataset(
+                    os.path.join(datadir, jsons['train']),
+                    os.path.join(datadir, tok_file),
+                    os.path.join(datadir, spk2gender_file),
+                    load_dir=os.path.join(datadir, bucket_load_dir),
+                    num_buckets=10)
+
+    dev_set = dataset.ESPnetBucketDataset(
+                os.path.join(datadir, jsons['val']),
+                os.path.join(datadir, tok_file),
+                num_buckets=10)
+
     bucket_train_loader = torch.utils.data.DataLoader(
                             train_set, 
                             batch_sampler=dataset.BucketBatchSampler(

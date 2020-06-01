@@ -47,13 +47,13 @@ class ESPnetBucketDataset(ESPnetDataset):
     a torch dataset using a version of the dataset bucketed by length
     '''
     def __init__(self, json_file, tok_file, load_dir=None, save_dir=None, 
-                 num_buckets=10, transform=None):
+                 num_buckets=1, transform=None):
         super().__init__(json_file, tok_file, transform)
         utt_ids = self.json.keys()
         feat_lens = {utt_id: self.json[utt_id]['input'][0]['shape'][0] for utt_id in utt_ids}
 
         if load_dir is not None:
-            self.buckets, self.utt2bucket = load_buckets(load_dir, num_buckets)
+            self.num_buckets, self.buckets, self.utt2bucket = load_buckets(load_dir)
         else:
             self.buckets, self.utt2bucket = bucket_dataset(utt_ids, 
                                                            feat_lens,
@@ -61,7 +61,7 @@ class ESPnetBucketDataset(ESPnetDataset):
             if save_dir is not None:
                 save_buckets(save_dir, self.buckets)
 
-        self.num_buckets = num_buckets
+            self.num_buckets = num_buckets
 
 def bucket_dataset(utt_ids, feat_lens, num_buckets):
     '''
@@ -104,23 +104,24 @@ def save_buckets(bucket_dir, buckets):
             for utt in buckets[i]:
                 f.write(utt + '\n')
 
-def load_buckets(bucket_dir, num_buckets):
+def load_buckets(bucket_dir):
     if not os.path.exists(bucket_dir):
         raise OSError(f'Path to load {bucket_dir} does not exist')
 
     buckets = {} 
     utt2bucket = {}
 
-    for i in range(num_buckets):
+    bucket_files = [os.path.join(bucket_dir, f) for f in os.listdir(bucket_dir)]
+
+    for i, bucket_file in enumerate(bucket_files):
         buckets[i] = []
-        bucket_file = os.path.join(bucket_dir, str(i))
         with open(bucket_file, 'r') as f:
             for line in f:
                 utt = line.strip()
                 buckets[i].append(utt)
                 utt2bucket[utt] = i
 
-    return buckets, utt2bucket
+    return len(bucket_files), buckets, utt2bucket
 
 class BucketBatchSampler(torch.utils.data.Sampler):
     '''
@@ -151,10 +152,14 @@ class BucketBatchSampler(torch.utils.data.Sampler):
 
         self.start_idx = [0 for i in range(self.num_buckets)]
 
+    # when buckets have uneven number of utterances in them, this becomes a 
+    # problem
+    # we can get batches with 0 items by sampling a bucket with nothing left
+    # in it
     def init_num_batches(self):
         '''calculate number of batches in each bucket, sum together'''
         num_batches = [len(bucket) for bucket in self.bucket2idx]
-        num_batches = [(num // self.batch_size + 1) for num in num_batches] # functools.map
+        num_batches = [int(np.ceil(num / self.batch_size)) for num in num_batches] # functools.map
 
         # populate a list with batch_nums of each bucket
         self.bucket_list = np.array([i for i in range(self.num_buckets) for j in range(num_batches[i])])

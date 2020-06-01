@@ -8,17 +8,16 @@ import dataset
 
 class ESPnetGenderBucketDataset(dataset.ESPnetDataset):
     '''
-    same as above, but with gender subsetting
+    same as ESPnetBucketDataset, but with gender subsetting
     '''
     def __init__(self, json_file, tok_file, spk2gender_file, load_dir=None, 
-                 save_dir=None, num_buckets=10, gender_frac=[0.5, 0.5], hrs=5, 
+                 save_dir=None, num_buckets=1, gender_frac=[0.5, 0.5], hrs=5, 
                  transform=None):
         super().__init__(json_file, tok_file, transform)
         utt_ids = self.json.keys()
         feat_lens = {utt_id: self.json[utt_id]['input'][0]['shape'][0] for utt_id in utt_ids}
         if load_dir is not None:
-            self.buckets, self.utt2bucket = dataset.load_buckets(load_dir, 
-                                                                 num_buckets)
+            self.num_buckets, self.buckets, self.utt2bucket = dataset.load_buckets(load_dir)
         else:
             new_utt_ids, self.utt2gender = gender_subset(utt_ids, feat_lens, 
                                                       spk2gender_file,
@@ -29,7 +28,7 @@ class ESPnetGenderBucketDataset(dataset.ESPnetDataset):
             if save_dir is not None:
                 dataset.save_buckets(save_dir, self.buckets)
 
-        self.num_buckets = num_buckets
+            self.num_buckets = num_buckets
 
 def gender_subset(utt_ids, feat_lens, spk2gender_fn, gender_frac=(0.5, 0.5), 
                   hrs=5):
@@ -71,7 +70,6 @@ def gender_subset(utt_ids, feat_lens, spk2gender_fn, gender_frac=(0.5, 0.5),
 def seconds_per_utt(length):
     # I'm not sure where in the ESPnet code these numbers are set, but I am sure
     # they are the right numbers 
-    #
     # n_fft = 400, n_shift = 160 in espnet/utils/compute-fbank-feats.py
     frame_len = 0.025 # taken empirically by comparing utterance length to the frame number
     frame_shift = 0.01 # same logic as above
@@ -86,9 +84,9 @@ if __name__=='__main__':
     balanced_set = ESPnetGenderBucketDataset(os.path.join(datadir, json_file),
                                              os.path.join(datadir, tok_file),
                                              spk2gender_file=os.path.join(datadir, spk2gender_file),
-#                                              save_dir='/scratch/asr_tmp/buckets',
-                                             load_dir='/scratch/asr_tmp/buckets',
+                                             save_dir='/share/data/speech/Data/dyunis/data/wsj_espnet/2080_buckets',
+#                                              load_dir='/scratch/asr_tmp/buckets',
                                              num_buckets=10,
-                                             gender_frac=(0.5, 0.5),
+                                             gender_frac=(0.2, 0.8),
                                              hrs=5)
 
