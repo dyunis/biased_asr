@@ -11,7 +11,8 @@
 - `decoder.py`: a greedy decoder taking in the log probabilities of a sequence
   and outputting the most probable indices
 - `gender_subset.py`: the file for taking WSJ and producing a dataset with 
-  certain fractions of gender data
+  certain fractions of gender data, but this data is already generated in the
+  dataset directory
 - `utils.py`: some small tools I use for debugging and optimizing, kinda 
   irrelevant
 
@@ -23,15 +24,15 @@ already with `safe_cptree`)
 see `main()` in `train.py` for more path info
 
 the balanced and imbalanced datasets are inside the WSJ directory at 
-`5050_buckets`, `8020_buckets` and `2080_buckets`, where the first number is 
+`buckets/5050`, `buckets/8020` and `buckets/2080`, where the first number is 
 the proportion of female speakers, and the second is the proportion of male
 
 ### TODO:
 - David:
   - [x] finish up dataset splitting code (in `gender_subset.py`)
-  - [x] code up WER evaluation (probably in `decoder.py` or a new file `eval.py`)
+  - [x] code up WER evaluation (in `decoder.py`)
   - normalizations (implement as a `transform` to use in `ESPnetBucketDataset`)
 - Pushkar:
-  - adversarial regularizer (ideally in `model.py`, take a look at the training
+  - adversarial regularizer (ideally in `models.py`, take a look at the training
     code in `train.py` and `dataset.py`)
 
