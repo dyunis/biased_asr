@@ -45,8 +45,7 @@ def batch_greedy_ctc_decode(log_prob, blank_idx=0, zero_infinity=False, to_remov
 
     return decoded, to_remove
 
-def compute_words(char_idxs, idx2char, space_idx=18, to_remove=-1):
-    char_idxs = char_idxs[char_idxs != to_remove]
+def compute_words(char_idxs, idx2char, space_idx=18):
     chars = [idx2char[idx] for idx in char_idxs]
     words = ''.join(chars)
     words = words.replace(idx2char[space_idx], ' ')

@@ -114,22 +114,23 @@ def train(datadir, jsons, tok_file, spk2gender_file, bucket_load_dir=None,
 
             for i in range(log_probs.shape[0]):
                 batch_dec = batch_decoded[i, :]
+                batch_dec = batch_dec[batch_dec != to_remove]
                 pred_words = decoder.compute_words(
                                     batch_dec, 
-                                    train_set.idx2tok, 
-                                    to_remove=to_remove)
+                                    train_set.idx2tok)
 
                 label_chars = data['label'][i].cpu().detach().numpy()
                 label_chars = label_chars[label_chars != 0] # remove padding
                 label_words = decoder.compute_words(
                                 label_chars,
-                                train_set.idx2tok,
-                                to_remove=to_remove)
+                                train_set.idx2tok)
 
+                cer = decoder.levenshtein(batch_dec, label_chars)/len(label_chars)
                 print('predicted:', ' '.join(pred_words))
                 print('label:', ' '.join(label_words))
-                dist = decoder.levenshtein(pred_words, label_words)
-                print(f'WER: {dist/len(label_words)}')
+                wer = decoder.levenshtein(pred_words, label_words)/len(label_words)
+                print(f'CER: {cer}')
+                print(f'WER: {wer}')
 
         dev_loss.append(np.mean(losses))
 
