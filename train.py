@@ -28,7 +28,7 @@ def main(args):
              'test': 'dump/test_eval92/deltafalse/data.json'}
     tok_file = 'lang_1char/train_si284_units.txt'
     spk2gender_file = 'train_si284/spk2gender'
-    bucket_load_dir = '5050_buckets'
+    bucket_load_dir = 'buckets/5050'
     utils.safe_copytree(datadir, tmpdir)
     train(tmpdir, jsons, tok_file, spk2gender_file, 
           bucket_load_dir=bucket_load_dir)
@@ -75,7 +75,7 @@ def train(datadir, jsons, tok_file, spk2gender_file, bucket_load_dir=None,
     model.to(device)
 
     n_iter = len(train_set)
-    n_epoch = 30
+    n_epoch = 50
     train_loss = []
     dev_loss = []
 
@@ -90,6 +90,7 @@ def train(datadir, jsons, tok_file, spk2gender_file, bucket_load_dir=None,
             loss.backward()
 
 #             gradient clipping does slowdown, value taken from ESPnet
+            torch.nn.utils.clip_grad_value_(model.parameters(), 10.0)
             torch.nn.utils.clip_grad_norm_(model.parameters(), 10.0)
             if torch.sum(torch.isnan(model.linear.weight.grad)) > 0:
                 print('Skipping training due to NaN in gradient')
@@ -107,13 +108,29 @@ def train(datadir, jsons, tok_file, spk2gender_file, bucket_load_dir=None,
                             data['feat_lens'].cuda(), data['label_lens'].cuda())
             losses.append(float(loss))
             log_probs = log_probs.cpu().detach().numpy()
-            batch_decoded = decoder.batch_greedy_ctc_decode(log_probs, 
-                                                            zero_infinity=True)
+            batch_decoded, to_remove = decoder.batch_greedy_ctc_decode(
+                                        log_probs, 
+                                        zero_infinity=True)
+
             for i in range(log_probs.shape[0]):
                 batch_dec = batch_decoded[i, :]
-                batch_dec = batch_dec[batch_dec != -1]
-                decoded = [train_set.idx2tok[idx] for idx in batch_dec]
-                print(' '.join(decoded))
+                pred_words = decoder.compute_words(
+                                    batch_dec, 
+                                    train_set.idx2tok, 
+                                    to_remove=to_remove)
+
+                label_chars = data['label'][i].cpu().detach().numpy()
+                label_chars = label_chars[label_chars != 0] # remove padding
+                label_words = decoder.compute_words(
+                                label_chars,
+                                train_set.idx2tok,
+                                to_remove=to_remove)
+
+                print('predicted:', ' '.join(pred_words))
+                print('label:', ' '.join(label_words))
+                dist = decoder.levenshtein(pred_words, label_words)
+                print(f'WER: {dist/len(label_words)}')
+
         dev_loss.append(np.mean(losses))
 
     model_dir = os.path.join(datadir, 'model')

@@ -21,7 +21,7 @@ def greedy_ctc_decode(log_prob, blank_idx=0, zero_infinity=False):
 
     return decoded
 
-def batch_greedy_ctc_decode(log_prob, blank_idx=0, zero_infinity=False):
+def batch_greedy_ctc_decode(log_prob, blank_idx=0, zero_infinity=False, to_remove=-1):
     '''
     input array is [bsize, seq_len, vocab_size]
     
@@ -34,16 +34,44 @@ def batch_greedy_ctc_decode(log_prob, blank_idx=0, zero_infinity=False):
     idxs = np.argmax(log_prob, axis=-1)
     decoded = idxs.copy()
     
-    prev_idxs = -1 * np.ones(idxs.shape[0])
+    prev_idxs = to_remove * np.ones(idxs.shape[0])
     for i in range(idxs.shape[1]):
         batch = idxs[:, i]
         decode_batch = decoded[:, i]
 
-        decode_batch[batch == blank_idx] = -1
-        decode_batch[batch == prev_idxs] = -1
+        decode_batch[batch == blank_idx] = to_remove 
+        decode_batch[batch == prev_idxs] = to_remove
         prev_idxs = batch
 
-    return decoded
+    return decoded, to_remove
+
+def compute_words(char_idxs, idx2char, space_idx=18, to_remove=-1):
+    char_idxs = char_idxs[char_idxs != to_remove]
+    chars = [idx2char[idx] for idx in char_idxs]
+    words = ''.join(chars)
+    words = words.replace(idx2char[space_idx], ' ')
+    words = words.split()
+    return words
+
+def levenshtein(pred, label):
+    d = np.zeros((len(pred) + 1, len(label) + 1), dtype=np.int)
+    for i in range(len(pred) + 1):
+        d[i, 0] = i
+
+    for j in range(len(label) + 1):
+        d[0, j] = j
+
+    for i in range(1, d.shape[0]):
+        for j in range(1, d.shape[1]):
+            insert = d[i - 1, j] + 1
+            delete = d[i, j - 1] + 1
+            sub = d[i - 1, j - 1]
+            if pred[i] != label[j]:
+                sub += 1
+
+            d[i, j] = min(delete, insert, sub)
+
+    return d[-1, -1]
 
 if __name__=='__main__':
     a = np.array([[1, 2, 3], [3, 2, 1], [1, 2, 3]])
