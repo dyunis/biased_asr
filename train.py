@@ -75,7 +75,7 @@ def train(datadir, jsons, tok_file, spk2gender_file, bucket_load_dir=None,
     model.to(device)
 
     n_iter = len(train_set)
-    n_epoch = 50
+    n_epoch = 100
     train_loss = []
     dev_loss = []
 
@@ -153,5 +153,89 @@ def recognize(args, datadir, jsons):
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description='WSJ CTC character ASR model')
+
+    parser.add_argument('--data_root',
+                        type=str,
+                        help='data directory',
+                        default='/share/data/speech/Data/dyunis/data/wsj_espnet')
+    parser.add_argument('--temp_root',
+                        type=str,
+                        help='temporary data directory',
+                        default='/scratch/asr_tmp')
+    parser.add_argument('--tok_file', 
+                        type=str,
+                        help='token file (idx -> token)',
+                        default='lang_1char/train_si284_units.txt')
+    parser.add_argument('--save_model',
+                        type=str,
+                        help='directory to save models',
+                        default='models')
+    parser.add_argument('--bucket_save_dir',
+                        type=str,
+                        help='directory to save data buckets')
+    parser.add_argument('--bucket_load_dir', 
+                        type=str,
+                        help='directory to load buckets from')
+    parser.add_argument('--num_buckets', 
+                        type=int, 
+                        help='number of buckets to split dataset into',
+                        default=10)
+
+    parser.add_argument('--hidden_dim',
+                        type=int,
+                        help='hidden dimension of the RNN acoustic model',
+                        default=512)
+    parser.add_argument('--n_layers',
+                        type=int,
+                        help='number of layers of RNN acoustic model',
+                        default=3)
+    parser.add_argument('--bidir',
+                        type=bool,
+                        help='whether acoustic model is bidirectional',
+                        default=True)
+
+    parser.add_argument('--n_epochs',
+                        type=int,
+                        help='number of epochs to train for',
+                        default=50)
+    parser.add_argument('--batch_size',
+                        type=int,
+                        help='minibatch size for training',
+                        default=16)
+    parser.add_argument('--learning_rate',
+                        type=float,
+                        help='learning rate for training',
+                        default=1e-4)
+    parser.add_argument('--norm_clip',
+                        type=float,
+                        help='value to clip gradient norm to',
+                        default=10.0)
+    parser.add_argument('--val_clip',
+                        type=float,
+                        help='value to clip gradient values to',
+                        default=10.0)
+
+    parser.add_argument('--seed',
+                        type=int,
+                        help='seed for random number generators',
+                        default=0)
+    parser.add_argument('--cleanup',
+                        type=bool,
+                        help='clean up temporary data at the end',
+                        default=False)
+
+    parser.add_argument('--spk2gender_file',
+                        type=str,
+                        help='spk2gender file path from kaldi',
+                        default='train_si284/spk2gender')
+    parser.add_argument('--prop_female',
+                        type=float,
+                        help='proportion of female speakers in dataset',
+                        default=0.5)
+    parser.add_argument('--n_hrs',
+                        type=float,
+                        help='number of hours of subsampled data to use',
+                        default=5.0)
+
     args = parser.parse_args()
     main(args)

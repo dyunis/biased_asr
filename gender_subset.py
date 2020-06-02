@@ -11,7 +11,7 @@ class ESPnetGenderBucketDataset(dataset.ESPnetDataset):
     same as ESPnetBucketDataset, but with gender subsetting
     '''
     def __init__(self, json_file, tok_file, spk2gender_file, load_dir=None, 
-                 save_dir=None, num_buckets=1, gender_frac=[0.5, 0.5], hrs=5, 
+                 save_dir=None, num_buckets=1, prop_female=0.5, hrs=5, 
                  transform=None):
         super().__init__(json_file, tok_file, transform)
         utt_ids = self.json.keys()
@@ -20,8 +20,8 @@ class ESPnetGenderBucketDataset(dataset.ESPnetDataset):
             self.num_buckets, self.buckets, self.utt2bucket = dataset.load_buckets(load_dir)
         else:
             new_utt_ids, self.utt2gender = gender_subset(utt_ids, feat_lens, 
-                                                      spk2gender_file,
-                                                      gender_frac, hrs)
+                                                         spk2gender_file,
+                                                         prop_female, hrs)
             self.buckets, self.utt2bucket = dataset.bucket_dataset(new_utt_ids, 
                                                                    feat_lens,
                                                                    num_buckets)
@@ -30,8 +30,7 @@ class ESPnetGenderBucketDataset(dataset.ESPnetDataset):
 
             self.num_buckets = num_buckets
 
-def gender_subset(utt_ids, feat_lens, spk2gender_fn, gender_frac=(0.5, 0.5), 
-                  hrs=5):
+def gender_subset(utt_ids, feat_lens, spk2gender_fn, prop_female=0.5, hrs=5):
     '''
     take a list of utterance ids, a file for speaker to gender map, a tuple of
     the fraction of data across gender classes, and the total amount of data in
@@ -39,7 +38,7 @@ def gender_subset(utt_ids, feat_lens, spk2gender_fn, gender_frac=(0.5, 0.5),
 
     returns a list of utterance ids to be used as the new training set
     '''
-    assert np.isclose(np.sum(gender_frac), 1.0), 'gender_frac must add up to 1'
+    assert prop_female <= 1.0, 'prop_female must be <= 1'
 
     spk2gender = {}
     with open(spk2gender_fn, 'r') as f:
@@ -47,7 +46,8 @@ def gender_subset(utt_ids, feat_lens, spk2gender_fn, gender_frac=(0.5, 0.5),
             line = line.split()
             spk2gender[line[0]] = line[1]
         
-    gender_s = {'f': 3600 * hrs * gender_frac[0], 'm': 3600 * hrs * gender_frac[1]}
+    gender_s = {'f': 3600 * hrs * prop_female,
+                'm': 3600 * hrs * (1 - prop_female)}
     utt2gender = {utt: spk2gender[utt[:3]] for utt in utt_ids}
 
 #     permute list of utterances (random.shuffle is in-place)
@@ -84,9 +84,9 @@ if __name__=='__main__':
     balanced_set = ESPnetGenderBucketDataset(os.path.join(datadir, json_file),
                                              os.path.join(datadir, tok_file),
                                              spk2gender_file=os.path.join(datadir, spk2gender_file),
-                                             save_dir='/share/data/speech/Data/dyunis/data/wsj_espnet/2080_buckets',
+                                             save_dir='/scratch/asr_tmp/buckets',
 #                                              load_dir='/scratch/asr_tmp/buckets',
                                              num_buckets=10,
-                                             gender_frac=(0.2, 0.8),
+                                             prop_female=0.7,
                                              hrs=5)
 
