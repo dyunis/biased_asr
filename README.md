@@ -31,7 +31,7 @@ the proportion of female speakers, and the second is the proportion of male
 - David:
   - [x] finish up dataset splitting code (in `gender_subset.py`)
   - [x] code up WER evaluation (in `decoder.py`)
-  - normalizations (implement as a `transform` to use in `ESPnetBucketDataset`)
+  - [x] normalizations (as transforms in `transforms.py`)
 - Pushkar:
   - adversarial regularizer (ideally in `models.py`, take a look at the training
     code in `train.py` and `dataset.py`)
