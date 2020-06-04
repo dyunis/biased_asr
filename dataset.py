@@ -114,8 +114,9 @@ def load_buckets(bucket_dir):
     buckets = {} 
     utt2bucket = {}
 
-    bucket_files = [os.path.join(bucket_dir, f) for f in os.listdir(bucket_dir)
-                    if os.path.isfile(f)]
+    bucket_files = [os.path.join(bucket_dir, f) for f in os.listdir(bucket_dir) 
+                    if not os.path.isdir(os.path.join(bucket_dir, f))]
+    
 
     for i, bucket_file in enumerate(bucket_files):
         buckets[i] = []

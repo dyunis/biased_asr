@@ -74,7 +74,6 @@ def train(datadir, jsons, tok_file, spk2gender_file, bucket_load_dir=None,
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, betas=(0.9, 0.98))
     model.to(device)
 
-    n_iter = len(train_set)
     n_epoch = 100
     train_loss = []
     dev_loss = []
