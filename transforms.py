@@ -33,7 +33,7 @@ class SpeakerNormalize(object):
 
 class GenderNormalize(object):
     ''' normalize per gender category '''
-    def __init__(self, utt2gender, gender2meanstd_file):
+    def __init__(self, gender2meanstd_file, utt2gender):
         with open(gender2meanstd_file, 'rb') as f:
             gender2meanstd = pickle.load(f)
 
@@ -112,18 +112,25 @@ def safe_pickle(obj, save_file):
         pickle.dump(obj, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 if __name__=='__main__':
-    datadir = '/scratch/asr_tmp/'
+    datadir = '/share/data/speech/Data/dyunis/data/wsj_espnet'
     json_file = 'dump/train_si284/deltafalse/data.json'
     tok_file = 'lang_1char/train_si284_units.txt'
     spk2gender_file = 'train_si284/spk2gender'
+    load_dir = 'buckets/8020'
     balanced_set = gender_subset.ESPnetGenderBucketDataset(
                     os.path.join(datadir, json_file),
                     os.path.join(datadir, tok_file),
                     spk2gender_file=os.path.join(datadir, spk2gender_file),
-                    load_dir='/scratch/asr_tmp/buckets/5050',
+                    load_dir=os.path.join(datadir, load_dir),
                     num_buckets=10)
-#     spk2meanstd = compute_spk_mean_std(balanced_set, save_file='/scratch/asr_tmp/buckets/5050_spk2meanstd.pkl')
-    gender2meanstd = compute_gender_mean_std(balanced_set, save_file='/scratch/asr_tmp/buckets/5050_gndr2meanstd.pkl')
-#     spk_norm = SpeakerNormalize('/scratch/asr_tmp/buckets/5050_spk2meanstd.pkl')
-    gender_norm = GenderNormalize(balanced_set.utt2gender,
-                                  '/scratch/asr_tmp/buckets/5050_gndr2meanstd.pkl')
+
+    spk2meanstd = compute_spk_mean_std(
+                    balanced_set,
+                    save_file=os.path.join(datadir, load_dir, 'stats/spk2meanstd.pkl'))
+
+    gender2meanstd = compute_gender_mean_std(
+                        balanced_set, 
+                        save_file=os.path.join(datadir, load_dir, 'stats/gndr2meanstd.pkl'))
+    spk_norm = SpeakerNormalize('/scratch/asr_tmp/buckets/5050_spk2meanstd.pkl')
+    gender_norm = GenderNormalize('/scratch/asr_tmp/buckets/5050/stats/gndr2meanstd.pkl',
+                                  balanced_set.utt2gender)
