@@ -10,6 +10,7 @@ import decoder
 import utils
 import models
 import gender_subset
+import transforms
 
 # TODO:
 # WER evaluation
@@ -38,16 +39,22 @@ def train(datadir, jsons, tok_file, spk2gender_file, bucket_load_dir=None,
           bucket_save_dir=None):
     bsize = 16
 
+    spk_normalize = transforms.SpeakerNormalize(
+                    os.path.join(datadir, bucket_load_dir, 'stats/spk2meanstd.pkl'))
+    utt_normalize = transforms.Normalize()
+                                
     train_set = gender_subset.ESPnetGenderBucketDataset(
                     os.path.join(datadir, jsons['train']),
                     os.path.join(datadir, tok_file),
                     os.path.join(datadir, spk2gender_file),
                     load_dir=os.path.join(datadir, bucket_load_dir),
+                    transform=spk_normalize,
                     num_buckets=10)
 
     dev_set = dataset.ESPnetBucketDataset(
                 os.path.join(datadir, jsons['val']),
                 os.path.join(datadir, tok_file),
+                transform=utt_normalize,
                 num_buckets=10)
 
     bucket_train_loader = torch.utils.data.DataLoader(
