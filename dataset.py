@@ -6,6 +6,7 @@ import numpy as np
 import kaldiio # kaldiio is faster at reading than kaldi_io
 import tqdm
 
+# TODO: datasets should use utt_ids as keys, not indices
 class ESPnetDataset(torch.utils.data.Dataset):
     '''
     a torch dataset reorganizing the json that ESPnet spits out
@@ -33,10 +34,12 @@ class ESPnetDataset(torch.utils.data.Dataset):
         label = [int(s) for s in label.split()]
         
         feat = kaldiio.load_mat(ark_fn)
-        if self.transform is not None:
-            feat = self.transform(feat)
 
         sample = {'utt_id': utt_id, 'feat': feat, 'label': label}
+
+        if self.transform is not None:
+            sample = self.transform(sample)
+
         return sample
 
     def __len__(self):

@@ -18,6 +18,15 @@ class ESPnetGenderBucketDataset(dataset.ESPnetDataset):
         feat_lens = {utt_id: self.json[utt_id]['input'][0]['shape'][0] for utt_id in utt_ids}
         if load_dir is not None:
             self.num_buckets, self.buckets, self.utt2bucket = dataset.load_buckets(load_dir)
+            # compute utt2gender
+            
+            spk2gender = {}
+            with open(spk2gender_file, 'r') as f:
+                for line in f:
+                    line = line.split()
+                    spk2gender[line[0]] = line[1]
+
+            self.utt2gender = {utt_id: spk2gender[utt_id[:3]] for utt_id in utt_ids}
         else:
             new_utt_ids, self.utt2gender = gender_subset(utt_ids, feat_lens, 
                                                          spk2gender_file,
