@@ -34,7 +34,6 @@ the proportion of female speakers, and the second is the proportion of male
   - [x] normalizations (as transforms in `transforms.py`)
   - [ ] argument parsing
   - [ ] logging and plotting for each experiment to record loss, CER, and WER
-  - [ ] saving models via best dev results
 - Pushkar:
   - adversarial regularizer (ideally in `models.py`, take a look at the training
     code in `train.py` and `dataset.py`)
