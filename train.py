@@ -18,56 +18,52 @@ import transforms
 # integrate arpa language models
 
 def main(args):
-    torch.manual_seed(0)
-    torch.backends.cudnn.deterministic = True
-    np.random.seed(0)
+    torch.manual_seed(args.seed)
+    torch.backends.cudnn.deterministic = args.determ
+    np.random.seed(args.seed)
 
-    datadir = '/share/data/speech/Data/dyunis/data/wsj_espnet'
-    tmpdir = '/scratch/asr_tmp'
     jsons = {'train': 'dump/train_si284/deltafalse/data.json',
              'val': 'dump/test_dev93/deltafalse/data.json',
              'test': 'dump/test_eval92/deltafalse/data.json'}
-    tok_file = 'lang_1char/train_si284_units.txt'
-    spk2gender_file = 'train_si284/spk2gender'
-    bucket_load_dir = 'buckets/5050'
-    utils.safe_copytree(datadir, tmpdir)
-    train(tmpdir, jsons, tok_file, spk2gender_file, 
-          bucket_load_dir=bucket_load_dir)
-#     utils.safe_rmtree(tmpdir)
+    args.bucket_load_dir = 'buckets/5050'
 
-def train(datadir, jsons, tok_file, spk2gender_file, bucket_load_dir=None, 
-          bucket_save_dir=None):
-    bsize = 16
 
+    utils.safe_copytree(args.data_root, args.temp_root)
+    train(args, jsons)
+    
+    if args.cleanup:
+        utils.safe_rmtree(args.temp_root)
+
+def train(args, jsons):
     spk_normalize = transforms.SpeakerNormalize(
-                        os.path.join(datadir, bucket_load_dir, 
+                        os.path.join(args.temp_root, args.bucket_load_dir, 
                                      'stats/spk2meanstd.pkl'))
     utt_normalize = transforms.Normalize()
                                 
     train_set = gender_subset.ESPnetGenderBucketDataset(
-                    os.path.join(datadir, jsons['train']),
-                    os.path.join(datadir, tok_file),
-                    os.path.join(datadir, spk2gender_file),
-                    load_dir=os.path.join(datadir, bucket_load_dir),
+                    os.path.join(args.temp_root, jsons['train']),
+                    os.path.join(args.temp_root, args.tok_file),
+                    os.path.join(args.temp_root, args.spk2gender_file),
+                    load_dir=os.path.join(args.temp_root, args.bucket_load_dir),
                     transform=None,
-                    num_buckets=10)
+                    num_buckets=args.n_buckets)
     gndr_normalize = transforms.GenderNormalize(
-                         os.path.join(datadir, bucket_load_dir, 
+                         os.path.join(args.temp_root, args.bucket_load_dir, 
                                       'stats/gndr2meanstd.pkl'),
                          train_set.utt2gender)
     train_set.transform = gndr_normalize
 
     dev_set = dataset.ESPnetBucketDataset(
-                os.path.join(datadir, jsons['val']),
-                os.path.join(datadir, tok_file),
+                os.path.join(args.temp_root, jsons['val']),
+                os.path.join(args.temp_root, args.tok_file),
                 transform=utt_normalize,
-                num_buckets=10)
+                num_buckets=args.n_buckets)
 
     bucket_train_loader = torch.utils.data.DataLoader(
                             train_set, 
                             batch_sampler=dataset.BucketBatchSampler(
                                 shuffle=True, 
-                                batch_size=bsize, 
+                                batch_size=args.batch_size, 
                                 utt2idx=train_set.utt2idx, 
                                 buckets=train_set.buckets),
                             collate_fn=dataset.collate)
@@ -75,23 +71,29 @@ def train(datadir, jsons, tok_file, spk2gender_file, bucket_load_dir=None,
                             dev_set,
                             batch_sampler=dataset.BucketBatchSampler(
                                 shuffle=True,
-                                batch_size=bsize,
+                                batch_size=args.batch_size,
                                 utt2idx=dev_set.utt2idx,
                                 buckets=dev_set.buckets),
                             collate_fn=dataset.collate)
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-    model = models.LSTM(num_layers=3)
+    model = models.LSTM(num_layers=args.n_layers, hidden_dim=args.hidden_dim,
+                        bidirectional=args.bidir)
+    if args.model_dir is not None:
+        if not os.path.exists(args.model_dir):
+            os.makedirs(args.model_dir)
+                        
     ctc_loss = torch.nn.CTCLoss(blank=0, reduction='mean', zero_infinity=True)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, betas=(0.9, 0.98))
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, 
+                                 betas=(0.9, 0.98))
     model.to(device)
 
-    n_epoch = 100
     train_loss = []
     dev_loss = []
+    best_dev_loss = np.inf
 
-    for epoch in range(n_epoch):
+    for epoch in range(args.n_epochs):
         losses = []
         model.train()
         for data in tqdm.tqdm(bucket_train_loader):
@@ -102,8 +104,8 @@ def train(datadir, jsons, tok_file, spk2gender_file, bucket_load_dir=None,
             loss.backward()
 
 #             gradient clipping does slowdown, value taken from ESPnet
-            torch.nn.utils.clip_grad_value_(model.parameters(), 10.0)
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 10.0)
+            torch.nn.utils.clip_grad_value_(model.parameters(), args.val_clip)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), args.norm_clip)
             if torch.sum(torch.isnan(model.linear.weight.grad)) > 0:
                 print('Skipping training due to NaN in gradient')
                 optimizer.zero_grad()
@@ -141,20 +143,34 @@ def train(datadir, jsons, tok_file, spk2gender_file, bucket_load_dir=None,
                 print('predicted:', ' '.join(pred_words))
                 print('label:', ' '.join(label_words))
                 word_errors = decoder.levenshtein(pred_words, label_words)
-                print(f'CER: {cer / len(label_chars)}')
-                print(f'WER: {wer / len(label_words)}')
+                print(f'CER: {char_errors / len(label_chars)}')
+                print(f'WER: {word_errors / len(label_words)}')
 
         dev_loss.append(np.mean(losses))
 
-    model_dir = os.path.join(datadir, 'model')
-    if not os.path.exists(model_dir):
-        os.makedirs(model_dir)
-    torch.save(model.state_dict(), os.path.join(model_dir, 'model.pt'))
+        if args.model_dir is not None:
+            if epoch % args.save_interval == 0:
+                torch.save(model.state_dict(), os.path.join(args.model_dir, 
+                                                            f'{epoch}.pt'))
+            if epoch == args.n_epochs - 1:
+                torch.save(model.state_dict(), os.path.join(args.model_dir, 
+                                                            f'{epoch}.pt'))
 
+            if dev_loss[-1] < best_dev_loss:
+                torch.save(model.state_dict(), os.path.join(args.model_dir, 
+                                                            'best.pt'))
+                best_dev_loss = dev_loss[-1]
+                
+
+# TODO: actually do test and dev-set recognition with avg WER (per gender)
 # TODO: look at shubham's paper and kaldi 4-gram for language model integration
 def recognize(args, datadir, jsons):
-    model = models.LSTM(args)
-    model.load_state_dict(torch.load(model_dir))
+    model = models.LSTM(num_layers=args.n_layers, hidden_dim=args.hidden_dim,
+                        bidirectional=args.bidir)
+
+    model.load_state_dict(torch.load(os.path.join(args.temp_root, 
+                                                  args.model_dir,
+                                                  'best.pt')))
     model.eval()
 
     for data in tqdm.tqdm(bucket_dev_loader):
@@ -178,7 +194,7 @@ if __name__=='__main__':
                         type=str,
                         help='token file (idx -> token)',
                         default='lang_1char/train_si284_units.txt')
-    parser.add_argument('--save_model',
+    parser.add_argument('--model_dir',
                         type=str,
                         help='directory to save models',
                         default='models')
@@ -188,7 +204,7 @@ if __name__=='__main__':
     parser.add_argument('--bucket_load_dir', 
                         type=str,
                         help='directory to load buckets from')
-    parser.add_argument('--num_buckets', 
+    parser.add_argument('--n_buckets', 
                         type=int, 
                         help='number of buckets to split dataset into',
                         default=10)
@@ -226,6 +242,10 @@ if __name__=='__main__':
                         type=float,
                         help='value to clip gradient values to',
                         default=10.0)
+    parser.add_argument('--save_interval',
+                        type=int,
+                        help='save model every so many epochs',
+                        default=10)
 
     parser.add_argument('--seed',
                         type=int,
@@ -235,6 +255,10 @@ if __name__=='__main__':
                         type=bool,
                         help='clean up temporary data at the end',
                         default=False)
+    parser.add_argument('--determ',
+                        type=bool,
+                        help='deterministic behavior for cuda',
+                        default=True)
 
     parser.add_argument('--spk2gender_file',
                         type=str,
