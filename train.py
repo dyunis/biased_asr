@@ -13,7 +13,9 @@ import gender_subset
 import transforms
 
 # TODO:
-# WER evaluation
+# avg WER evaluation per gender
+# plotting and logging of loss, CER, WER
+# automatic resuming of experiments based on last model file in model_dir
 # beam search decoding
 # integrate arpa language models
 
