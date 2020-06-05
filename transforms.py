@@ -17,7 +17,7 @@ class Normalize(object):
     
     def __call__(self, sample):
         feat = sample['feat']
-        sample['feat'] = (feat - np.mean(feat, axis=0)) / np.std(feat, axis=0)
+        sample['feat'] = ((feat - np.mean(feat, axis=0)) / np.std(feat, axis=0)).astype(np.float32)
         return sample
 
 class SpeakerNormalize(object):
@@ -28,7 +28,7 @@ class SpeakerNormalize(object):
 
     def __call__(self, sample):
         mean, std = self.spk2meanstd[sample['utt_id'][:3]]
-        sample['feat'] = (sample['feat'] - mean) / std
+        sample['feat'] = ((sample['feat'] - mean) / std).astype(np.float32)
         return sample
 
 class GenderNormalize(object):
@@ -41,9 +41,8 @@ class GenderNormalize(object):
 
     def __call__(self, sample):
         utt, feat = sample['utt_id'], sample['feat']
-        mean = self.utt2meanstd[utt][0, :]
-        std = self.utt2meanstd[utt][1, :]
-        sample['feat'] = (feat - mean) / std
+        mean, std = self.utt2meanstd[utt]
+        sample['feat'] = ((feat - mean) / std).astype(np.float32)
         return sample
 
 def compute_spk_mean_std(dataset, save_file=None):

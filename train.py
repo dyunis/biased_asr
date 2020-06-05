@@ -48,8 +48,12 @@ def train(datadir, jsons, tok_file, spk2gender_file, bucket_load_dir=None,
                     os.path.join(datadir, tok_file),
                     os.path.join(datadir, spk2gender_file),
                     load_dir=os.path.join(datadir, bucket_load_dir),
-                    transform=spk_normalize,
+                    transform=None,
                     num_buckets=10)
+    gndr_normalize = transforms.GenderNormalize(
+                    os.path.join(datadir, bucket_load_dir, 'stats/gndr2meanstd.pkl'),
+                    train_set.utt2gender)
+    train_set.transform = gndr_normalize
 
     dev_set = dataset.ESPnetBucketDataset(
                 os.path.join(datadir, jsons['val']),
