@@ -20,7 +20,7 @@ class LSTM(torch.nn.Module):
                                       self.out_dim)
         self.classifier = torch.nn.LogSoftmax(dim=-1)
 
-    def forward(self, X):
+    def forward(self, X, classify=True):
         '''
         X: (batch, seq_len, F) 
         y: (batch, seq_len, V)
@@ -29,8 +29,10 @@ class LSTM(torch.nn.Module):
         h0 = self.init_hidden(len(X))
         y, self.hidden = self.lstm(X.transpose(0, 1), h0)
 
-        y = self.linear(y).transpose(0, 1)
-        y = self.classifier(y)
+        if classify:
+            y = self.linear(y).transpose(0, 1)
+            y = self.classifier(y)
+
         return y
 
     def init_hidden(self, batch_size):
