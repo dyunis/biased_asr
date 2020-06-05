@@ -17,7 +17,8 @@ class Normalize(object):
     
     def __call__(self, sample):
         feat = sample['feat']
-        sample['feat'] = ((feat - np.mean(feat, axis=0)) / np.std(feat, axis=0)).astype(np.float32)
+        sample['feat'] = ((feat - np.mean(feat, axis=0)) 
+                           / np.std(feat, axis=0)).astype(np.float32)
         return sample
 
 class SpeakerNormalize(object):
@@ -37,7 +38,8 @@ class GenderNormalize(object):
         with open(gender2meanstd_file, 'rb') as f:
             gender2meanstd = pickle.load(f)
 
-        self.utt2meanstd = {utt: gender2meanstd[utt2gender[utt]] for utt in utt2gender.keys()}
+        self.utt2meanstd = {utt: gender2meanstd[utt2gender[utt]] 
+                            for utt in utt2gender.keys()}
 
     def __call__(self, sample):
         utt, feat = sample['utt_id'], sample['feat']
@@ -125,11 +127,16 @@ if __name__=='__main__':
 
     spk2meanstd = compute_spk_mean_std(
                     balanced_set,
-                    save_file=os.path.join(datadir, load_dir, 'stats/spk2meanstd.pkl'))
+                    save_file=os.path.join(datadir, load_dir,
+                                           'stats/spk2meanstd.pkl'))
 
     gender2meanstd = compute_gender_mean_std(
                         balanced_set, 
-                        save_file=os.path.join(datadir, load_dir, 'stats/gndr2meanstd.pkl'))
+                        save_file=os.path.join(datadir, 
+                                               load_dir,
+                                               'stats/gndr2meanstd.pkl'))
+
     spk_norm = SpeakerNormalize('/scratch/asr_tmp/buckets/5050_spk2meanstd.pkl')
-    gender_norm = GenderNormalize('/scratch/asr_tmp/buckets/5050/stats/gndr2meanstd.pkl',
-                                  balanced_set.utt2gender)
+    gender_norm = GenderNormalize(
+                      '/scratch/asr_tmp/buckets/5050/stats/gndr2meanstd.pkl',
+                      balanced_set.utt2gender)

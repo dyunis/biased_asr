@@ -53,7 +53,8 @@ class ESPnetBucketDataset(ESPnetDataset):
                  num_buckets=1, transform=None):
         super().__init__(json_file, tok_file, transform)
         utt_ids = self.json.keys()
-        feat_lens = {utt_id: self.json[utt_id]['input'][0]['shape'][0] for utt_id in utt_ids}
+        feat_lens = {utt_id: self.json[utt_id]['input'][0]['shape'][0] 
+                     for utt_id in utt_ids}
 
         if load_dir is not None:
             self.num_buckets, self.buckets, self.utt2bucket = load_buckets(load_dir)
@@ -93,7 +94,8 @@ def bucket_dataset(utt_ids, feat_lens, num_buckets):
 
     # add the remainder to the last bucket
     if num_buckets * per_bucket < len(utts):
-        buckets[num_buckets - 1] = buckets[num_buckets - 1] + utts[num_buckets * per_bucket:]
+        buckets[num_buckets - 1] = (buckets[num_buckets - 1] + 
+                                    utts[num_buckets * per_bucket:])
 
     return buckets, utt2bucket
 
@@ -150,7 +152,8 @@ class BucketBatchSampler(torch.utils.data.Sampler):
         self.num_buckets = len(buckets.keys())
         self.bucket2idx = []
         for i in buckets.keys():
-            self.bucket2idx.append(np.array([self.utt2idx[utt] for utt in buckets[i]]))
+            self.bucket2idx.append(np.array([self.utt2idx[utt]
+                                             for utt in buckets[i]]))
 
         self.length = sum([len(bucket) for bucket in self.bucket2idx])
         self.init_num_batches()
@@ -164,10 +167,12 @@ class BucketBatchSampler(torch.utils.data.Sampler):
     def init_num_batches(self):
         '''calculate number of batches in each bucket, sum together'''
         num_batches = [len(bucket) for bucket in self.bucket2idx]
-        num_batches = [int(np.ceil(num / self.batch_size)) for num in num_batches] # functools.map
+        num_batches = [int(np.ceil(num / self.batch_size)) 
+                       for num in num_batches] # functools.map
 
         # populate a list with batch_nums of each bucket
-        self.bucket_list = np.array([i for i in range(self.num_buckets) for j in range(num_batches[i])])
+        self.bucket_list = np.array([i for i in range(self.num_buckets) 
+                                     for j in range(num_batches[i])])
     
     def reset_epoch(self):
         '''reset the sampler every epoch, shuffle the batches'''
@@ -202,9 +207,11 @@ def collate(minibatch):
     batch = {}
     batch['utt_id'] = idx2utt
     batch['feat'] = torch.nn.utils.rnn.pad_sequence(feats, batch_first=True)
-    batch['feat_lens'] = torch.tensor([feat.shape[0] for feat in feats], dtype=torch.int32)
+    batch['feat_lens'] = torch.tensor([feat.shape[0] for feat in feats], 
+                                      dtype=torch.int32)
     batch['label'] = torch.nn.utils.rnn.pad_sequence(labels, batch_first=True)
-    batch['label_lens'] = torch.tensor([label.shape[0] for label in labels], dtype=torch.int32)
+    batch['label_lens'] = torch.tensor([label.shape[0] for label in labels],
+                                       dtype=torch.int32)
     return batch
 
 if __name__=='__main__':

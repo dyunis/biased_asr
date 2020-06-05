@@ -21,7 +21,8 @@ def greedy_ctc_decode(log_prob, blank_idx=0, zero_infinity=False):
 
     return decoded
 
-def batch_greedy_ctc_decode(log_prob, blank_idx=0, zero_infinity=False, to_remove=-1):
+def batch_greedy_ctc_decode(log_prob, blank_idx=0, zero_infinity=False, 
+                            to_remove=-1):
     '''
     input array is [bsize, seq_len, vocab_size]
     

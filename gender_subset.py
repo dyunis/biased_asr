@@ -15,7 +15,9 @@ class ESPnetGenderBucketDataset(dataset.ESPnetDataset):
                  transform=None):
         super().__init__(json_file, tok_file, transform)
         utt_ids = self.json.keys()
-        feat_lens = {utt_id: self.json[utt_id]['input'][0]['shape'][0] for utt_id in utt_ids}
+        feat_lens = {utt_id: self.json[utt_id]['input'][0]['shape'][0]
+                     for utt_id in utt_ids}
+
         if load_dir is not None:
             self.num_buckets, self.buckets, self.utt2bucket = dataset.load_buckets(load_dir)
             # compute utt2gender
@@ -26,7 +28,8 @@ class ESPnetGenderBucketDataset(dataset.ESPnetDataset):
                     line = line.split()
                     spk2gender[line[0]] = line[1]
 
-            self.utt2gender = {utt_id: spk2gender[utt_id[:3]] for utt_id in utt_ids}
+            self.utt2gender = {utt_id: spk2gender[utt_id[:3]] 
+                               for utt_id in utt_ids}
         else:
             new_utt_ids, self.utt2gender = gender_subset(utt_ids, feat_lens, 
                                                          spk2gender_file,
@@ -90,12 +93,11 @@ if __name__=='__main__':
     json_file = 'dump/train_si284/deltafalse/data.json'
     tok_file = 'lang_1char/train_si284_units.txt'
     spk2gender_file = 'train_si284/spk2gender'
-    balanced_set = ESPnetGenderBucketDataset(os.path.join(datadir, json_file),
-                                             os.path.join(datadir, tok_file),
-                                             spk2gender_file=os.path.join(datadir, spk2gender_file),
-                                             save_dir='/scratch/asr_tmp/buckets',
-#                                              load_dir='/scratch/asr_tmp/buckets',
-                                             num_buckets=10,
-                                             prop_female=0.7,
-                                             hrs=5)
+    balanced_set = ESPnetGenderBucketDataset(
+                       os.path.join(datadir, json_file),
+                       os.path.join(datadir, tok_file),
+                       spk2gender_file=os.path.join(datadir, spk2gender_file),
+                       save_dir='/scratch/asr_tmp/buckets',
+#                        load_dir='/scratch/asr_tmp/buckets',
+                       num_buckets=10, prop_female=0.7, hrs=5)
 

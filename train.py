@@ -40,7 +40,8 @@ def train(datadir, jsons, tok_file, spk2gender_file, bucket_load_dir=None,
     bsize = 16
 
     spk_normalize = transforms.SpeakerNormalize(
-                    os.path.join(datadir, bucket_load_dir, 'stats/spk2meanstd.pkl'))
+                        os.path.join(datadir, bucket_load_dir, 
+                                     'stats/spk2meanstd.pkl'))
     utt_normalize = transforms.Normalize()
                                 
     train_set = gender_subset.ESPnetGenderBucketDataset(
@@ -51,8 +52,9 @@ def train(datadir, jsons, tok_file, spk2gender_file, bucket_load_dir=None,
                     transform=None,
                     num_buckets=10)
     gndr_normalize = transforms.GenderNormalize(
-                    os.path.join(datadir, bucket_load_dir, 'stats/gndr2meanstd.pkl'),
-                    train_set.utt2gender)
+                         os.path.join(datadir, bucket_load_dir, 
+                                      'stats/gndr2meanstd.pkl'),
+                         train_set.utt2gender)
     train_set.transform = gndr_normalize
 
     dev_set = dataset.ESPnetBucketDataset(
@@ -135,12 +137,12 @@ def train(datadir, jsons, tok_file, spk2gender_file, bucket_load_dir=None,
                                 label_chars,
                                 train_set.idx2tok)
 
-                cer = decoder.levenshtein(batch_dec, label_chars)/len(label_chars)
+                char_errors = decoder.levenshtein(batch_dec, label_chars)
                 print('predicted:', ' '.join(pred_words))
                 print('label:', ' '.join(label_words))
-                wer = decoder.levenshtein(pred_words, label_words)/len(label_words)
-                print(f'CER: {cer}')
-                print(f'WER: {wer}')
+                word_errors = decoder.levenshtein(pred_words, label_words)
+                print(f'CER: {cer / len(label_chars)}')
+                print(f'WER: {wer / len(label_words)}')
 
         dev_loss.append(np.mean(losses))
 
