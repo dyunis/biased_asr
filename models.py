@@ -27,13 +27,12 @@ class LSTM(torch.nn.Module):
         '''
         # re-init hidden so that changing batch size isn't a problem
         h0 = self.init_hidden(len(X))
-        y, self.hidden = self.lstm(X.transpose(0, 1), h0)
+        embed, self.hidden = self.lstm(X.transpose(0, 1), h0)
 
-        if classify:
-            y = self.linear(y).transpose(0, 1)
-            y = self.classifier(y)
+        y = self.linear(embed).transpose(0, 1)
+        y = self.classifier(y)
 
-        return y
+        return y, embed.transpose(0, 1)
 
     def init_hidden(self, batch_size):
         weight = next(self.parameters())

@@ -100,7 +100,7 @@ def train(args, jsons):
         model.train()
         for data in tqdm.tqdm(bucket_train_loader):
             optimizer.zero_grad()
-            log_probs = model(data['feat'].cuda())
+            log_probs, embed = model(data['feat'].cuda())
             loss = ctc_loss(log_probs.transpose(0, 1), data['label'].cuda(), 
                             data['feat_lens'].cuda(), data['label_lens'].cuda())
             loss.backward()
@@ -119,7 +119,7 @@ def train(args, jsons):
             
         losses = []
         for data in bucket_dev_loader:
-            log_probs = model(data['feat'].cuda())
+            log_probs, embed = model(data['feat'].cuda())
             loss = ctc_loss(log_probs.transpose(0, 1), data['label'].cuda(), 
                             data['feat_lens'].cuda(), data['label_lens'].cuda())
             losses.append(float(loss))
@@ -176,7 +176,7 @@ def recognize(args, datadir, jsons):
     model.eval()
 
     for data in tqdm.tqdm(bucket_dev_loader):
-        log_probs = model(data['feat'].cuda())
+        log_probs, embed = model(data['feat'].cuda())
         log_probs = log_probs.cpu().detach().numpy()
         batch_decoded = decoder.batch_greedy_ctc_decode(log_probs, 
                                                         zero_infinity=True)
