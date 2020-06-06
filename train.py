@@ -1,9 +1,11 @@
 import os
 import argparse
+import logging
 
 import numpy as np
 import torch
 import tqdm
+import matplotlib.pyplot as plt
 
 import dataset
 import decoder
@@ -13,13 +15,15 @@ import gender_subset
 import transforms
 
 # TODO:
+# plotting and logging to file (doesn't seem to work)
 # avg WER evaluation per gender
-# plotting and logging of loss, CER, WER
 # automatic resuming of experiments based on last model file in model_dir
 # beam search decoding
 # integrate arpa language models
 
 def main(args):
+    logging.basicConfig(filename=os.path.join(args.model_dir, args.log_file),
+                        filemode='a', level=logging.DEBUG)
     torch.manual_seed(args.seed)
     torch.backends.cudnn.deterministic = args.determ
     np.random.seed(args.seed)
@@ -28,7 +32,6 @@ def main(args):
              'val': 'dump/test_dev93/deltafalse/data.json',
              'test': 'dump/test_eval92/deltafalse/data.json'}
     args.bucket_load_dir = 'buckets/5050'
-
 
     utils.safe_copytree(args.data_root, args.temp_root)
     train(args, jsons)
@@ -40,7 +43,7 @@ def train(args, jsons):
     spk_normalize = transforms.SpeakerNormalize(
                         os.path.join(args.temp_root, args.bucket_load_dir, 
                                      'stats/spk2meanstd.pkl'))
-    utt_normalize = transforms.Normalize()
+#     utt_normalize = transforms.Normalize()
                                 
     train_set = gender_subset.ESPnetGenderBucketDataset(
                     os.path.join(args.temp_root, jsons['train']),
@@ -49,16 +52,16 @@ def train(args, jsons):
                     load_dir=os.path.join(args.temp_root, args.bucket_load_dir),
                     transform=None,
                     num_buckets=args.n_buckets)
-    gndr_normalize = transforms.GenderNormalize(
-                         os.path.join(args.temp_root, args.bucket_load_dir, 
-                                      'stats/gndr2meanstd.pkl'),
-                         train_set.utt2gender)
-    train_set.transform = gndr_normalize
+#     gndr_normalize = transforms.GenderNormalize(
+#                          os.path.join(args.temp_root, args.bucket_load_dir, 
+#                                       'stats/gndr2meanstd.pkl'),
+#                          train_set.utt2gender)
+#     train_set.transform = gndr_normalize
 
     dev_set = dataset.ESPnetBucketDataset(
                 os.path.join(args.temp_root, jsons['val']),
                 os.path.join(args.temp_root, args.tok_file),
-                transform=utt_normalize,
+                transform=None,
                 num_buckets=args.n_buckets)
 
     bucket_train_loader = torch.utils.data.DataLoader(
@@ -92,7 +95,7 @@ def train(args, jsons):
     model.to(device)
 
     train_loss = []
-    dev_loss = []
+    dev_loss, dev_cer, dev_wer = [], [], []
     best_dev_loss = np.inf
 
     for epoch in range(args.n_epochs):
@@ -109,7 +112,7 @@ def train(args, jsons):
             torch.nn.utils.clip_grad_value_(model.parameters(), args.val_clip)
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.norm_clip)
             if torch.sum(torch.isnan(model.linear.weight.grad)) > 0:
-                print('Skipping training due to NaN in gradient')
+                logging.info('Skipping training due to NaN in gradient')
                 optimizer.zero_grad()
             optimizer.step()
 
@@ -117,38 +120,29 @@ def train(args, jsons):
 
         train_loss.append(np.mean(losses))
             
-        losses = []
+        losses, cer, wer = [], [], []
+        model.eval()
         for data in bucket_dev_loader:
             log_probs, embed = model(data['feat'].cuda())
             loss = ctc_loss(log_probs.transpose(0, 1), data['label'].cuda(), 
                             data['feat_lens'].cuda(), data['label_lens'].cuda())
+
             losses.append(float(loss))
-            log_probs = log_probs.cpu().detach().numpy()
-            batch_decoded, to_remove = decoder.batch_greedy_ctc_decode(
-                                        log_probs, 
-                                        zero_infinity=True)
-
-            for i in range(log_probs.shape[0]):
-                batch_dec = batch_decoded[i, :]
-                batch_dec = batch_dec[batch_dec != to_remove]
-                pred_words = decoder.compute_words(
-                                    batch_dec, 
-                                    train_set.idx2tok)
-
-                label_chars = data['label'][i].cpu().detach().numpy()
-                label_chars = label_chars[label_chars != 0] # remove padding
-                label_words = decoder.compute_words(
-                                label_chars,
-                                train_set.idx2tok)
-
-                char_errors = decoder.levenshtein(batch_dec, label_chars)
-                print('predicted:', ' '.join(pred_words))
-                print('label:', ' '.join(label_words))
-                word_errors = decoder.levenshtein(pred_words, label_words)
-                print(f'CER: {char_errors / len(label_chars)}')
-                print(f'WER: {word_errors / len(label_words)}')
+            batch_cer, batch_wer = compute_cer_wer(
+                                       log_probs.cpu().detach().numpy(), 
+                                       data['label'].cpu().detach().numpy(),
+                                       train_set.idx2tok)
+            cer.extend(batch_cer)
+            wer.extend(batch_wer)
 
         dev_loss.append(np.mean(losses))
+        dev_cer.append(np.mean(cer))
+        dev_wer.append(np.mean(wer))
+
+        logging.info(f'training loss: {train_loss[-1]}')
+        logging.info(f'dev loss: {dev_loss[-1]}')
+        logging.info(f'dev CER: {dev_cer[-1]}')
+        logging.info(f'dev WER: {dev_wer[-1]}')
 
         if args.model_dir is not None:
             if epoch % args.save_interval == 0:
@@ -162,7 +156,34 @@ def train(args, jsons):
                 torch.save(model.state_dict(), os.path.join(args.model_dir, 
                                                             'best.pt'))
                 best_dev_loss = dev_loss[-1]
-                
+
+def compute_cer_wer(log_probs, label, idx2tok):
+    batch_decoded, to_remove = decoder.batch_greedy_ctc_decode(
+                                log_probs, 
+                                zero_infinity=True)
+
+    cer, wer = [], []
+    for i in range(log_probs.shape[0]):
+        batch_dec = batch_decoded[i, :]
+        batch_dec = batch_dec[batch_dec != to_remove]
+        pred_words = decoder.compute_words(
+                            batch_dec, 
+                            idx2tok)
+
+        label_chars = label[label != 0] # remove padding
+        label_words = decoder.compute_words(
+                        label_chars,
+                        idx2tok)
+
+        char_errors = decoder.levenshtein(batch_dec, label_chars)
+        word_errors = decoder.levenshtein(pred_words, label_words)
+        cer.append(char_errors / len(label_chars))
+        wer.append(word_errors / len(label_words))
+
+    logging.info(f'label: {" ".join(label_words)}')
+    logging.info(f'predicted: {" ".join(pred_words)}')
+
+    return cer, wer
 
 # TODO: actually do test and dev-set recognition with avg WER (per gender)
 # TODO: look at shubham's paper and kaldi 4-gram for language model integration
@@ -196,6 +217,10 @@ if __name__=='__main__':
                         type=str,
                         help='token file (idx -> token)',
                         default='lang_1char/train_si284_units.txt')
+    parser.add_argument('--log_file',
+                        type=str,
+                        help='file to log to',
+                        default='log.log')
     parser.add_argument('--model_dir',
                         type=str,
                         help='directory to save models',
