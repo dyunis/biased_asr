@@ -110,7 +110,7 @@ def safe_pickle(obj, save_file):
         raise OSError(f'Path to save {save_file} already exists')
 
     with open(save_file, 'wb') as f:
-        pickle.dump(obj, f, protocol=pickle.HIGHEST_PROTOCOL)
+        pickle.dump(obj, f, protocol=pickle.DEFAULT_PROTOCOL)
 
 if __name__=='__main__':
     datadir = '/share/data/speech/Data/dyunis/data/wsj_espnet'
@@ -136,7 +136,7 @@ if __name__=='__main__':
                                                load_dir,
                                                'stats/gndr2meanstd.pkl'))
 
-    spk_norm = SpeakerNormalize('/scratch/asr_tmp/buckets/5050_spk2meanstd.pkl')
-    gender_norm = GenderNormalize(
-                      '/scratch/asr_tmp/buckets/5050/stats/gndr2meanstd.pkl',
-                      balanced_set.utt2gender)
+#     spk_norm = SpeakerNormalize('/scratch/asr_tmp/buckets/5050_spk2meanstd.pkl')
+#     gender_norm = GenderNormalize(
+#                       '/scratch/asr_tmp/buckets/5050/stats/gndr2meanstd.pkl',
+#                       balanced_set.utt2gender)

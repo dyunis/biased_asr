@@ -53,6 +53,26 @@ def compute_words(char_idxs, idx2char, space_idx=18):
     words = words.split()
     return words
 
+def compute_cer_wer(log_probs, label, idx2tok):
+    batch_decoded, to_remove = batch_greedy_ctc_decode(log_probs, 
+                                                       zero_infinity=True)
+
+    cer, wer = [], []
+    for i in range(log_probs.shape[0]):
+        batch_dec = batch_decoded[i, :]
+        batch_dec = batch_dec[batch_dec != to_remove]
+        pred_words = compute_words(batch_dec, idx2tok)
+
+        label_chars = label[label != 0] # remove padding
+        label_words = compute_words(label_chars, idx2tok)
+
+        char_errors = levenshtein(batch_dec, label_chars)
+        word_errors = levenshtein(pred_words, label_words)
+        cer.append(char_errors / len(label_chars))
+        wer.append(word_errors / len(label_words))
+
+    return cer, wer
+
 def levenshtein(pred, label):
     d = np.zeros((len(pred) + 1, len(label) + 1), dtype=np.int)
     for i in range(1, d.shape[0]):

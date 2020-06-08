@@ -22,24 +22,33 @@ import transforms
 # integrate arpa language models
 
 def main(args):
+    jsons = {'train': 'dump/train_si284/deltafalse/data.json',
+             'dev': 'dump/test_dev93/deltafalse/data.json',
+             'test': 'dump/test_eval92/deltafalse/data.json'}
+    spk2genders = {'train': 'train_si284/spk2gender',
+                   'dev': 'test_dev93/spk2gender',
+                   'test': 'test_eval92/spk2gender'}
+
+    args.bucket_load_dir = 'buckets/5050'
+
+    utils.safe_copytree(args.data_root, args.temp_root)
+    if not os.path.exists(args.model_dir):
+        os.makedirs(args.model_dir)
+
     logging.basicConfig(filename=os.path.join(args.model_dir, args.log_file),
-                        filemode='a', level=logging.DEBUG)
+                        filemode='a', level=logging.INFO)
+
     torch.manual_seed(args.seed)
     torch.backends.cudnn.deterministic = args.determ
     np.random.seed(args.seed)
 
-    jsons = {'train': 'dump/train_si284/deltafalse/data.json',
-             'val': 'dump/test_dev93/deltafalse/data.json',
-             'test': 'dump/test_eval92/deltafalse/data.json'}
-    args.bucket_load_dir = 'buckets/5050'
-
-    utils.safe_copytree(args.data_root, args.temp_root)
-    train(args, jsons)
+    train(args, jsons, spk2genders)
+    evaluate(args, jsons, spk2genders)
     
     if args.cleanup:
         utils.safe_rmtree(args.temp_root)
 
-def train(args, jsons):
+def train(args, jsons, spk2genders):
     spk_normalize = transforms.SpeakerNormalize(
                         os.path.join(args.temp_root, args.bucket_load_dir, 
                                      'stats/spk2meanstd.pkl'))
@@ -48,7 +57,7 @@ def train(args, jsons):
     train_set = gender_subset.ESPnetGenderBucketDataset(
                     os.path.join(args.temp_root, jsons['train']),
                     os.path.join(args.temp_root, args.tok_file),
-                    os.path.join(args.temp_root, args.spk2gender_file),
+                    os.path.join(args.temp_root, spk2genders['train']),
                     load_dir=os.path.join(args.temp_root, args.bucket_load_dir),
                     transform=None,
                     num_buckets=args.n_buckets)
@@ -58,11 +67,12 @@ def train(args, jsons):
 #                          train_set.utt2gender)
 #     train_set.transform = gndr_normalize
 
-    dev_set = dataset.ESPnetBucketDataset(
-                os.path.join(args.temp_root, jsons['val']),
-                os.path.join(args.temp_root, args.tok_file),
-                transform=None,
-                num_buckets=args.n_buckets)
+    dev_set = gender_subset.ESPnetGenderBucketDataset(
+                  os.path.join(args.temp_root, jsons['dev']),
+                  os.path.join(args.temp_root, args.tok_file),
+                  os.path.join(args.temp_root, spk2genders['dev']),
+                  transform=None,
+                  num_buckets=args.n_buckets)
 
     bucket_train_loader = torch.utils.data.DataLoader(
                             train_set, 
@@ -72,6 +82,7 @@ def train(args, jsons):
                                 utt2idx=train_set.utt2idx, 
                                 buckets=train_set.buckets),
                             collate_fn=dataset.collate)
+
     bucket_dev_loader = torch.utils.data.DataLoader(
                             dev_set,
                             batch_sampler=dataset.BucketBatchSampler(
@@ -128,7 +139,7 @@ def train(args, jsons):
                             data['feat_lens'].cuda(), data['label_lens'].cuda())
 
             losses.append(float(loss))
-            batch_cer, batch_wer = compute_cer_wer(
+            batch_cer, batch_wer = decoder.compute_cer_wer(
                                        log_probs.cpu().detach().numpy(), 
                                        data['label'].cpu().detach().numpy(),
                                        train_set.idx2tok)
@@ -139,10 +150,14 @@ def train(args, jsons):
         dev_cer.append(np.mean(cer))
         dev_wer.append(np.mean(wer))
 
+#         log a single female and male utterance prediction vs label
+        logging.info(f'Epoch: {epoch}')
+        logging.info('----')
         logging.info(f'training loss: {train_loss[-1]}')
         logging.info(f'dev loss: {dev_loss[-1]}')
         logging.info(f'dev CER: {dev_cer[-1]}')
         logging.info(f'dev WER: {dev_wer[-1]}')
+        logging.info('    ')
 
         if args.model_dir is not None:
             if epoch % args.save_interval == 0:
@@ -157,50 +172,119 @@ def train(args, jsons):
                                                             'best.pt'))
                 best_dev_loss = dev_loss[-1]
 
-def compute_cer_wer(log_probs, label, idx2tok):
-    batch_decoded, to_remove = decoder.batch_greedy_ctc_decode(
-                                log_probs, 
-                                zero_infinity=True)
+    make_epoch_plot(train_loss, 'train loss', os.path.join(args.temp_root,
+                                                           args.model_dir,
+                                                           'train_loss.png'))
+    make_epoch_plot(dev_loss, 'dev loss', os.path.join(args.temp_root,
+                                                       args.model_dir,
+                                                       'dev_loss.png'))
+    make_epoch_plot(dev_cer, 'dev CER', os.path.join(args.temp_root,
+                                                     args.model_dir,
+                                                     'dev_cer.png'))
+    make_epoch_plot(dev_wer, 'dev WER', os.path.join(args.temp_root,
+                                                     args.model_dir,
+                                                     'dev_wer.png'))
 
-    cer, wer = [], []
-    for i in range(log_probs.shape[0]):
-        batch_dec = batch_decoded[i, :]
-        batch_dec = batch_dec[batch_dec != to_remove]
-        pred_words = decoder.compute_words(
-                            batch_dec, 
-                            idx2tok)
+def make_epoch_plot(x, x_name, save_file):
+    plt.plot(np.arange(len(x)), x)
+    plt.title(f'Epochs vs {x_name}')
+    plt.savefig(save_file)
 
-        label_chars = label[label != 0] # remove padding
-        label_words = decoder.compute_words(
-                        label_chars,
-                        idx2tok)
-
-        char_errors = decoder.levenshtein(batch_dec, label_chars)
-        word_errors = decoder.levenshtein(pred_words, label_words)
-        cer.append(char_errors / len(label_chars))
-        wer.append(word_errors / len(label_words))
-
-    logging.info(f'label: {" ".join(label_words)}')
-    logging.info(f'predicted: {" ".join(pred_words)}')
-
-    return cer, wer
-
-# TODO: actually do test and dev-set recognition with avg WER (per gender)
 # TODO: look at shubham's paper and kaldi 4-gram for language model integration
-def recognize(args, datadir, jsons):
+def evaluate(args, jsons, spk2genders):
     model = models.LSTM(num_layers=args.n_layers, hidden_dim=args.hidden_dim,
                         bidirectional=args.bidir)
 
     model.load_state_dict(torch.load(os.path.join(args.temp_root, 
                                                   args.model_dir,
                                                   'best.pt')))
-    model.eval()
 
-    for data in tqdm.tqdm(bucket_dev_loader):
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
+
+    splits = ['train', 'dev', 'test']
+    for split in splits:
+        evaluate_split(args, jsons, spk2genders, model, split=split)
+
+def evaluate_split(args, jsons, spk2genders, model, split='train'):
+    if split == 'train':
+        gender_dataset = gender_subset.ESPnetGenderBucketDataset(
+                         os.path.join(args.temp_root, jsons[split]),
+                         os.path.join(args.temp_root, args.tok_file),
+                         os.path.join(args.temp_root, spk2genders[split]),
+                         load_dir=os.path.join(args.temp_root, args.bucket_load_dir),
+                         transform=None,
+                         num_buckets=args.n_buckets)
+    else:
+        gender_dataset = gender_subset.ESPnetGenderBucketDataset(
+                         os.path.join(args.temp_root, jsons[split]),
+                         os.path.join(args.temp_root, args.tok_file),
+                         os.path.join(args.temp_root, spk2genders[split]),
+                         transform=None,
+                         num_buckets=args.n_buckets)
+
+    gender_dataloader = torch.utils.data.DataLoader(
+                            gender_dataset, 
+                            batch_sampler=dataset.BucketBatchSampler(
+                                shuffle=True, 
+                                batch_size=args.batch_size, 
+                                utt2idx=gender_dataset.utt2idx, 
+                                buckets=gender_dataset.buckets),
+                            collate_fn=dataset.collate)
+
+
+    stats = evaluate_dataset(model, gender_dataset, gender_dataloader)
+    
+    logging.info(f'Final results on {split}')
+    logging.info('----')
+    for key in stats.keys():
+        logging.info(f'{key}: {stats[key]}')
+    logging.info('    ')
+
+def evaluate_dataset(model, gender_dataset, gender_dataloader):
+    cer, wer, m_cer, m_wer, f_cer, f_wer = [], [], [], [], [], []
+    model.eval()
+    for data in tqdm.tqdm(gender_dataloader):
         log_probs, embed = model(data['feat'].cuda())
         log_probs = log_probs.cpu().detach().numpy()
-        batch_decoded = decoder.batch_greedy_ctc_decode(log_probs, 
-                                                        zero_infinity=True)
+        labels = data['label'].cpu().detach().numpy()
+
+        idx2gender = np.array([gender_dataset.utt2gender[utt]=='f' 
+                               for utt in data['utt_id']])
+        m_log_probs = log_probs[idx2gender == 0, :, :]
+        m_labels = labels[idx2gender == 0, :]
+        f_log_probs = log_probs[idx2gender == 1, :, :]
+        f_labels = labels[idx2gender == 1, :]
+
+        f_batch_cer, f_batch_wer = decoder.compute_cer_wer(
+                                       f_log_probs,
+                                       f_labels,
+                                       gender_dataset.idx2tok)
+        m_batch_cer, m_batch_wer = decoder.compute_cer_wer(
+                                       m_log_probs,
+                                       m_labels,
+                                       gender_dataset.idx2tok)
+        batch_cer, batch_wer = decoder.compute_cer_wer(
+                                   log_probs, 
+                                   labels,
+                                   gender_dataset.idx2tok)
+
+        f_cer.extend(f_batch_cer)
+        f_wer.extend(f_batch_wer)
+        m_cer.extend(m_batch_cer)
+        m_wer.extend(m_batch_wer)
+        cer.extend(batch_cer)
+        wer.extend(batch_wer)
+
+    stats = {}
+    stats['cer'] = np.mean(cer)
+    stats['wer'] = np.mean(wer)
+    stats['f_cer'] = np.mean(f_cer)
+    stats['f_wer'] = np.mean(f_wer)
+    stats['m_cer'] = np.mean(m_cer)
+    stats['m_wer'] = np.mean(m_wer)
+
+    return stats
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description='WSJ CTC character ASR model')
@@ -287,10 +371,6 @@ if __name__=='__main__':
                         help='deterministic behavior for cuda',
                         default=True)
 
-    parser.add_argument('--spk2gender_file',
-                        type=str,
-                        help='spk2gender file path from kaldi',
-                        default='train_si284/spk2gender')
     parser.add_argument('--prop_female',
                         type=float,
                         help='proportion of female speakers in dataset',
