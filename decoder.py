@@ -63,7 +63,9 @@ def compute_cer_wer(log_probs, label, idx2tok):
         batch_dec = batch_dec[batch_dec != to_remove]
         pred_words = compute_words(batch_dec, idx2tok)
 
-        label_chars = label[label != 0] # remove padding
+        batch_lbl = label[i, :]
+        label_chars = batch_lbl[batch_lbl != 0] # remove padding
+
         label_words = compute_words(label_chars, idx2tok)
 
         char_errors = levenshtein(batch_dec, label_chars)

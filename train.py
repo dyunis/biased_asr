@@ -42,7 +42,9 @@ def main(args):
     torch.backends.cudnn.deterministic = args.determ
     np.random.seed(args.seed)
 
-    train(args, jsons, spk2genders)
+    if not args.eval_only:
+        train(args, jsons, spk2genders)
+
     evaluate(args, jsons, spk2genders)
     
     if args.cleanup:
@@ -289,6 +291,10 @@ def evaluate_dataset(model, gender_dataset, gender_dataloader):
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description='WSJ CTC character ASR model')
 
+    parser.add_argument('--eval_only',
+                        action='store_true',
+                        help='skip training step',
+                        default=False)
     parser.add_argument('--data_root',
                         type=str,
                         help='data directory',
@@ -363,7 +369,7 @@ if __name__=='__main__':
                         help='seed for random number generators',
                         default=0)
     parser.add_argument('--cleanup',
-                        type=bool,
+                        action='store_true',
                         help='clean up temporary data at the end',
                         default=False)
     parser.add_argument('--determ',
