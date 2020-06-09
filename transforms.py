@@ -114,27 +114,41 @@ def safe_pickle(obj, save_file):
 
 if __name__=='__main__':
     datadir = '/share/data/speech/Data/dyunis/data/wsj_espnet'
-    json_file = 'dump/train_si284/deltafalse/data.json'
     tok_file = 'lang_1char/train_si284_units.txt'
-    spk2gender_file = 'train_si284/spk2gender'
-    load_dir = 'buckets/8020'
-    balanced_set = gender_subset.ESPnetGenderBucketDataset(
-                    os.path.join(datadir, json_file),
-                    os.path.join(datadir, tok_file),
-                    spk2gender_file=os.path.join(datadir, spk2gender_file),
-                    load_dir=os.path.join(datadir, load_dir),
-                    num_buckets=10)
+    load_dir = 'buckets/2080'
 
-    spk2meanstd = compute_spk_mean_std(
-                    balanced_set,
-                    save_file=os.path.join(datadir, load_dir,
-                                           'stats/spk2meanstd.pkl'))
+    jsons = {'train': 'dump/train_si284/deltafalse/data.json',
+             'dev': 'dump/test_dev93/deltafalse/data.json',
+             'test': 'dump/test_eval92/deltafalse/data.json'}
+    spk2genders = {'train': 'train_si284/spk2gender',
+                   'dev': 'test_dev93/spk2gender',
+                   'test': 'test_eval92/spk2gender'}
 
-    gender2meanstd = compute_gender_mean_std(
-                        balanced_set, 
-                        save_file=os.path.join(datadir, 
-                                               load_dir,
-                                               'stats/gndr2meanstd.pkl'))
+    for split in jsons.keys():
+        if split == 'train':
+            gender_dataset = gender_subset.ESPnetGenderBucketDataset(
+                             os.path.join(datadir, jsons[split]),
+                             os.path.join(datadir, tok_file),
+                             spk2gender_file=os.path.join(datadir, spk2genders[split]),
+                             load_dir=os.path.join(datadir, load_dir),
+                             num_buckets=10)
+        else:
+            gender_dataset = gender_subset.ESPnetGenderBucketDataset(
+                             os.path.join(datadir, jsons[split]),
+                             os.path.join(datadir, tok_file),
+                             spk2gender_file=os.path.join(datadir, spk2genders[split]),
+                             num_buckets=10)
+            
+
+        spk2meanstd = compute_spk_mean_std(
+                        gender_dataset,
+                        save_file=os.path.join(datadir, load_dir,
+                                               f'{split}_stats/spk2meanstd.pkl'))
+
+        gender2meanstd = compute_gender_mean_std(
+                            gender_dataset, 
+                            save_file=os.path.join(datadir, load_dir,
+                                                   f'{split}_stats/gndr2meanstd.pkl'))
 
 #     spk_norm = SpeakerNormalize('/scratch/asr_tmp/buckets/5050_spk2meanstd.pkl')
 #     gender_norm = GenderNormalize(

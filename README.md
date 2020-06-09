@@ -32,11 +32,29 @@ the proportion of female speakers, and the second is the proportion of male
   - [x] finish up dataset splitting code (in `gender_subset.py`)
   - [x] code up WER evaluation (in `decoder.py`)
   - [x] normalizations (as transforms in `transforms.py`)
-  - [ ] avg WER evaluation per gender
-  - [ ] logging and plotting for each experiment to record loss, CER, and WER
+  - [x] avg WER evaluation per gender
+  - [x] logging and plotting for each experiment to record loss, CER, and WER
   - [ ] automatic resuming of experiments based on last model in `model_dir`
   - [ ] slurm timeouts (chip did 3.7 hrs always)
+  - [ ] give pushkar `.sh` file to run all the experiments
 - Pushkar:
   - adversarial regularizer (ideally in `models.py`, take a look at the training
     code in `train.py` and `dataset.py`)
+
+### Experiment list:
+- no normalization:
+  - 50/50 dataset
+  - 80/20 dataset
+- utterance normalization:
+  - 50/50 dataset
+  - 80/20 dataset
+- speaker normalization:
+  - 50/50 dataset
+  - 80/20 dataset
+- gender normalization:
+  - 50/50 dataset
+  - 80/20 dataset
+- adversarial regularizer:
+  - 50/50 dataset
+  - 80/20 dataset
 

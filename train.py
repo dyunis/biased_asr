@@ -15,8 +15,6 @@ import gender_subset
 import transforms
 
 # TODO:
-# plotting and logging to file (doesn't seem to work)
-# avg WER evaluation per gender
 # automatic resuming of experiments based on last model file in model_dir
 # beam search decoding
 # integrate arpa language models
@@ -51,48 +49,13 @@ def main(args):
         utils.safe_rmtree(args.temp_root)
 
 def train(args, jsons, spk2genders):
-    spk_normalize = transforms.SpeakerNormalize(
-                        os.path.join(args.temp_root, args.bucket_load_dir, 
-                                     'stats/spk2meanstd.pkl'))
-#     utt_normalize = transforms.Normalize()
-                                
-    train_set = gender_subset.ESPnetGenderBucketDataset(
-                    os.path.join(args.temp_root, jsons['train']),
-                    os.path.join(args.temp_root, args.tok_file),
-                    os.path.join(args.temp_root, spk2genders['train']),
-                    load_dir=os.path.join(args.temp_root, args.bucket_load_dir),
-                    transform=None,
-                    num_buckets=args.n_buckets)
-#     gndr_normalize = transforms.GenderNormalize(
-#                          os.path.join(args.temp_root, args.bucket_load_dir, 
-#                                       'stats/gndr2meanstd.pkl'),
-#                          train_set.utt2gender)
-#     train_set.transform = gndr_normalize
+    train_set, bucket_train_loader = make_dataset_dataloader(args, jsons,
+                                                             spk2genders,
+                                                             split='train')
 
-    dev_set = gender_subset.ESPnetGenderBucketDataset(
-                  os.path.join(args.temp_root, jsons['dev']),
-                  os.path.join(args.temp_root, args.tok_file),
-                  os.path.join(args.temp_root, spk2genders['dev']),
-                  transform=None,
-                  num_buckets=args.n_buckets)
-
-    bucket_train_loader = torch.utils.data.DataLoader(
-                            train_set, 
-                            batch_sampler=dataset.BucketBatchSampler(
-                                shuffle=True, 
-                                batch_size=args.batch_size, 
-                                utt2idx=train_set.utt2idx, 
-                                buckets=train_set.buckets),
-                            collate_fn=dataset.collate)
-
-    bucket_dev_loader = torch.utils.data.DataLoader(
-                            dev_set,
-                            batch_sampler=dataset.BucketBatchSampler(
-                                shuffle=True,
-                                batch_size=args.batch_size,
-                                utt2idx=dev_set.utt2idx,
-                                buckets=dev_set.buckets),
-                            collate_fn=dataset.collate)
+    dev_set, bucket_dev_loader = make_dataset_dataloader(args, jsons,
+                                                         spk2genders,
+                                                         split='dev')
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
@@ -189,8 +152,9 @@ def train(args, jsons, spk2genders):
 
 def make_epoch_plot(x, x_name, save_file):
     plt.plot(np.arange(len(x)), x)
-    plt.title(f'Epochs vs {x_name}')
+    plt.title(f'{x_name} vs epoch')
     plt.savefig(save_file)
+    plt.clf()
 
 # TODO: look at shubham's paper and kaldi 4-gram for language model integration
 def evaluate(args, jsons, spk2genders):
@@ -208,22 +172,32 @@ def evaluate(args, jsons, spk2genders):
     for split in splits:
         evaluate_split(args, jsons, spk2genders, model, split=split)
 
-def evaluate_split(args, jsons, spk2genders, model, split='train'):
+def make_dataset_dataloader(args, jsons, spk2genders, split='train'):
     if split == 'train':
-        gender_dataset = gender_subset.ESPnetGenderBucketDataset(
-                         os.path.join(args.temp_root, jsons[split]),
-                         os.path.join(args.temp_root, args.tok_file),
-                         os.path.join(args.temp_root, spk2genders[split]),
-                         load_dir=os.path.join(args.temp_root, args.bucket_load_dir),
-                         transform=None,
-                         num_buckets=args.n_buckets)
+        load_dir = os.path.join(args.temp_root, args.bucket_load_dir)
     else:
-        gender_dataset = gender_subset.ESPnetGenderBucketDataset(
-                         os.path.join(args.temp_root, jsons[split]),
-                         os.path.join(args.temp_root, args.tok_file),
-                         os.path.join(args.temp_root, spk2genders[split]),
-                         transform=None,
-                         num_buckets=args.n_buckets)
+        load_dir = None
+
+    gender_dataset = gender_subset.ESPnetGenderBucketDataset(
+                     os.path.join(args.temp_root, jsons[split]),
+                     os.path.join(args.temp_root, args.tok_file),
+                     os.path.join(args.temp_root, spk2genders[split]),
+                     load_dir=load_dir,
+                     num_buckets=args.n_buckets)
+
+    if args.normalize == 'utt':
+        gender_dataset.transform = transforms.Normalize()
+    elif args.normalize == 'spk':
+        gender_dataset.transform = transforms.SpeakerNormalize(
+                                       os.path.join(args.temp_root,
+                                                    args.bucket_load_dir,
+                                                    f'{split}_stats/spk2meanstd.pkl'))
+    elif args.normalize == 'gndr':
+        gender_dataset.transform = transforms.GenderNormalize(
+                                       os.path.join(args.temp_root, 
+                                                    args.bucket_load_dir, 
+                                                    f'{split}_stats/gndr2meanstd.pkl'),
+                                       gender_dataset.utt2gender)
 
     gender_dataloader = torch.utils.data.DataLoader(
                             gender_dataset, 
@@ -234,6 +208,13 @@ def evaluate_split(args, jsons, spk2genders, model, split='train'):
                                 buckets=gender_dataset.buckets),
                             collate_fn=dataset.collate)
 
+    return gender_dataset, gender_dataloader
+
+
+def evaluate_split(args, jsons, spk2genders, model, split='train'):
+    gender_dataset, gender_dataloader = make_dataset_dataloader(args, jsons,
+                                                                spk2genders,
+                                                                split=split)
 
     stats = evaluate_dataset(model, gender_dataset, gender_dataloader)
     
@@ -385,6 +366,10 @@ if __name__=='__main__':
                         type=float,
                         help='number of hours of subsampled data to use',
                         default=5.0)
+    parser.add_argument('--normalize',
+                        type=str,
+                        help='type of normalization [utt, spk, gndr] to use',
+                        default=None)
 
     args = parser.parse_args()
     main(args)
