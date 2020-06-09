@@ -122,7 +122,7 @@ def train(args, jsons, spk2genders):
         logging.info(f'dev loss: {dev_loss[-1]}')
         logging.info(f'dev CER: {dev_cer[-1]}')
         logging.info(f'dev WER: {dev_wer[-1]}')
-        logging.info('    ')
+        logging.info('\n')
 
         if args.model_dir is not None:
             if epoch % args.save_interval == 0:
@@ -222,7 +222,7 @@ def evaluate_split(args, jsons, spk2genders, model, split='train'):
     logging.info('----')
     for key in stats.keys():
         logging.info(f'{key}: {stats[key]}')
-    logging.info('    ')
+    logging.info('\n')
 
 def evaluate_dataset(model, gender_dataset, gender_dataloader):
     cer, wer, m_cer, m_wer, f_cer, f_wer = [], [], [], [], [], []
