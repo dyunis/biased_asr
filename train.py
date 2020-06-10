@@ -1,6 +1,7 @@
 import os
 import argparse
 import logging
+import json
 
 import numpy as np
 import torch
@@ -61,9 +62,6 @@ def train(args, jsons, spk2genders):
 
     model = models.LSTM(num_layers=args.n_layers, hidden_dim=args.hidden_dim,
                         bidirectional=args.bidir)
-    if args.model_dir is not None:
-        if not os.path.exists(args.model_dir):
-            os.makedirs(args.model_dir)
                         
     ctc_loss = torch.nn.CTCLoss(blank=0, reduction='mean', zero_infinity=True)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate, 
@@ -149,6 +147,11 @@ def train(args, jsons, spk2genders):
     make_epoch_plot(dev_wer, 'dev WER', os.path.join(args.temp_root,
                                                      args.model_dir,
                                                      'dev_wer.png'))
+    epoch_stats = {'train_loss': train_loss, 'dev_loss': dev_loss, 
+                  'dev_cer': dev_cer, 'dev WER': dev_wer}
+    json_file = os.path.join(args.temp_root, args.model_dir, 'epoch_stats.json')
+    with open(json_file, 'w') as f:
+        json.dump(epoch_stats, f)
 
 def make_epoch_plot(x, x_name, save_file):
     plt.plot(np.arange(len(x)), x)
@@ -168,9 +171,12 @@ def evaluate(args, jsons, spk2genders):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
-    splits = ['train', 'dev', 'test']
-    for split in splits:
-        evaluate_split(args, jsons, spk2genders, model, split=split)
+    evaluate_split(args, jsons, spk2genders, model, split='train')
+    evaluate_split(args, jsons, spk2genders, model, split='dev')
+    if args.test:
+        evaluate_split(args, jsons, spk2genders, model, split='test')
+
+
 
 def make_dataset_dataloader(args, jsons, spk2genders, split='train'):
     if split == 'train':
@@ -281,7 +287,6 @@ if __name__=='__main__':
                         help='data directory',
                         default='/share/data/speech/Data/dyunis/data/wsj_espnet')
     parser.add_argument('--temp_root',
-                        type=str,
                         help='temporary data directory',
                         default='/scratch/asr_tmp')
     parser.add_argument('--tok_file', 
@@ -306,6 +311,11 @@ if __name__=='__main__':
                         type=int, 
                         help='number of buckets to split dataset into',
                         default=10)
+    parser.add_argument('--test',
+                        help='record results on test set',
+                        action='store_true',
+                        default=False)
+
 
     parser.add_argument('--hidden_dim',
                         type=int,
