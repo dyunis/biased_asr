@@ -1,5 +1,4 @@
 #!/usr/bin/bash
-rm -r /scratch/asr_tmp
 
 # no normalization
 python train.py --model_dir=/scratch/asr_tmp/exps/5050_1e-4 --bucket_load_dir=buckets/5050
