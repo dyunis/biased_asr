@@ -69,12 +69,15 @@ def gender_subset(utt_ids, feat_lens, spk2gender_fn, prop_female=0.5, hrs=5):
     new_utt_ids = []
     idx = 0
     while gender_s['f'] > 0 or gender_s['m'] > 0:
+
         gender = utt2gender[utt_ids[idx]]
         if gender_s[gender] <= 0:
+            idx += 1
             continue
 
         new_utt_ids.append(utt_ids[idx])
         gender_s[gender] -= seconds_per_utt(feat_lens[utt_ids[idx]])
+
         idx += 1
         if idx == len(utt_ids):
             break
@@ -99,7 +102,7 @@ if __name__=='__main__':
                        os.path.join(datadir, json_file),
                        os.path.join(datadir, tok_file),
                        spk2gender_file=os.path.join(datadir, spk2gender_file),
-                       save_dir='/scratch/asr_tmp/buckets',
-#                        load_dir='/scratch/asr_tmp/buckets',
-                       num_buckets=10, prop_female=0.7, hrs=5)
-
+                       save_dir='/share/data/speech/Data/dyunis/data/wsj_espnet/buckets/2080',
+#                        load_dir='/share/data/speech/Data/dyunis/data/wsj_espnet/buckets/2080',
+                       prop_female=0.2,
+                       num_buckets=10)

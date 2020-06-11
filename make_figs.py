@@ -1,11 +1,14 @@
+import os
+import glob
+
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-import glob
 
 import models
 import dataset
 import gender_subset
+import decoder
 
 def get_preds_v_labels(datadir, expdir, save_file):
     model = models.LSTM(num_layers=3, hidden_dim=512, bidirectional=True)
@@ -27,17 +30,17 @@ def get_preds_v_labels(datadir, expdir, save_file):
         device = torch.device('cpu')
         model.to(device)
 
-        counter = (0, 0)
-        idxs = (0, 0)
-        for i in range(len(gender_dataset)):
+        counter = [0, 0]
+        idxs = [0, 0]
+        for i in range(200, len(gender_dataset)):
             if sum(counter) >= 2:
                 break
             data = gender_dataset[i]
 
-            if utt2gender[data['utt_id']] == 'f' and counter[0] == 0:
+            if gender_dataset.utt2gender[data['utt_id']] == 'f' and counter[0] == 0:
                 idxs[0] = i
                 counter[0] = 1
-            elif utt2gender[data['utt_id']] == 'm' and counter[1] == 0:
+            elif gender_dataset.utt2gender[data['utt_id']] == 'm' and counter[1] == 0:
                 idxs[1] = i
                 counter[1] = 1
             else:
@@ -48,22 +51,24 @@ def get_preds_v_labels(datadir, expdir, save_file):
         lines[wt]['m'] = []
         for i, idx in enumerate(idxs):
             data = gender_dataset[idx]
-            log_probs, embed = model(data['feat'])
+            feat = data['feat'].copy()[None, ...]
+            
+            log_probs, embed = model(torch.tensor(feat))
             log_probs = log_probs.detach().numpy()
-            labels = data['label'].detach().numpy()
+            labels = np.array(data['label'])
             
             preds, to_remove = decoder.batch_greedy_ctc_decode(
                                    log_probs,
                                    zero_infinity=True)
             preds = preds[preds != -1]
 
-            pred_words = decoder.compute_words(preds, gender_dataset.idx2char)
-            label_words = decoder.compute_words(labels, gender_dataset.idx2char)
+            pred_words = decoder.compute_words(preds, gender_dataset.idx2tok)
+            label_words = decoder.compute_words(labels, gender_dataset.idx2tok)
             
             gndr = 'f' if i == 0 else 'm'
             lines[wt][gndr].append(f'{gndr}:')
-            lines[wt][gndr].append(f'Predicted:\n{pred_words}')
-            lines[wt][gndr].append(f'Label:\n{label_words}')
+            lines[wt][gndr].append(f'Predicted:\n{" ".join(pred_words)}')
+            lines[wt][gndr].append(f'Label:\n{" ".join(label_words)}')
 
     with open(save_file, 'w') as f:
         for wt in lines.keys():
@@ -86,7 +91,7 @@ def make_barplots(er, fer, mer, ylabel, ymin, ymax, save_file):
     rects_m = plt.bar(index + 2*bar_width, mer, bar_width, label='Male')
 
     plt.ylabel(ylabel)
-    plt.ylim(0, ylimit)
+    plt.ylim(ymin, ymax)
     plt.yticks(np.arange(ymin, ymax, 0.05))
 
     plt.xlabel('Experiment')
@@ -109,12 +114,17 @@ if __name__=='__main__':
     fer = [0.401, 0.501, 0.412, 0.491, 0.406, 0.473, 0.408, 0.498, 0, 0] 
 
 #     dev wer
-    er = [0.900, 0.996, 0.933, 0.979, 0.916, 0.991, 0.899, 1.012, 0, 0]
-    fer = [0.896, 1.007, 0.920, 0.972, 0.903, 0.992, 0.894, 1.031, 0, 0]
-    mer = [0.905, 0.984, 0.946, 0.985, 0.930, 0.990, 0.906, 0.992, 0, 0]
+#     er = [0.900, 0.996, 0.933, 0.979, 0.916, 0.991, 0.899, 1.012, 0, 0]
+#     fer = [0.896, 1.007, 0.920, 0.972, 0.903, 0.992, 0.894, 1.031, 0, 0]
+#     mer = [0.905, 0.984, 0.946, 0.985, 0.930, 0.990, 0.906, 0.992, 0, 0]
 
 #     test cer
 
 #     test wer
 
-    make_barplots(er, mer, fer, 'CER', 0, 0.5, 'cer.png')
+#     make_barplots(er, mer, fer, 'CER', 0, 0.55, 'cer.png')
+
+    datadir = '/scratch/asr_tmp/'
+    expdir = '/scratch/asr_tmp/exps/2080_1e-4'
+    save_file = 'model_preds.txt'
+    get_preds_v_labels(datadir, expdir, save_file)

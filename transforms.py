@@ -115,7 +115,7 @@ def safe_pickle(obj, save_file):
 if __name__=='__main__':
     datadir = '/share/data/speech/Data/dyunis/data/wsj_espnet'
     tok_file = 'lang_1char/train_si284_units.txt'
-    load_dir = 'buckets/2080'
+    load_dir = 'buckets/5050'
 
     jsons = {'train': 'dump/train_si284/deltafalse/data.json',
              'dev': 'dump/test_dev93/deltafalse/data.json',
