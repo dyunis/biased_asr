@@ -28,8 +28,6 @@ def main(args):
                    'dev': 'test_dev93/spk2gender',
                    'test': 'test_eval92/spk2gender'}
 
-    args.bucket_load_dir = 'buckets/5050'
-
     utils.safe_copytree(args.data_root, args.temp_root)
     if not os.path.exists(args.model_dir):
         os.makedirs(args.model_dir)
