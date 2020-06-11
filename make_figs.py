@@ -74,20 +74,16 @@ def get_preds_v_labels(datadir, expdir, save_file):
                 f.write('\n')
             f.write('\n')
 
-def make_barplots(ylabel, ymin, ymax, save_file):
+def make_barplots(er, fer, mer, ylabel, ymin, ymax, save_file):
     n_groups = 10
-#     data to plot
-    f_er = np.ones(10) * 0.2
-    m_er = np.ones(10) * 0.3
-    er = np.ones(10) * 0.25
 
     fig, ax = plt.subplots()
     index = np.arange(n_groups)
     bar_width = 0.22
 
     rects = plt.bar(index, er, bar_width, label='Combined')
-    rects_f = plt.bar(index + bar_width, f_er, bar_width, label='Female')
-    rects_m = plt.bar(index + 2*bar_width, f_er, bar_width, label='Male')
+    rects_f = plt.bar(index + bar_width, fer, bar_width, label='Female')
+    rects_m = plt.bar(index + 2*bar_width, mer, bar_width, label='Male')
 
     plt.ylabel(ylabel)
     plt.ylim(0, ylimit)
@@ -107,4 +103,18 @@ def make_barplots(ylabel, ymin, ymax, save_file):
     plt.clf()
 
 if __name__=='__main__':
-    make_barplots('CER', 0, 0.5, 'cer.png')
+#     dev cer 
+    er = [0.389, 0.491, 0.392, 0.476, 0.387, 0.463, 0.393, 0.486, 0, 0]
+    mer = [0.377, 0.482, 0.373, 0.462, 0.370, 0.453, 0.378, 0.473, 0, 0]
+    fer = [0.401, 0.501, 0.412, 0.491, 0.406, 0.473, 0.408, 0.498, 0, 0] 
+
+#     dev wer
+    er = [0.900, 0.996, 0.933, 0.979, 0.916, 0.991, 0.899, 1.012, 0, 0]
+    fer = [0.896, 1.007, 0.920, 0.972, 0.903, 0.992, 0.894, 1.031, 0, 0]
+    mer = [0.905, 0.984, 0.946, 0.985, 0.930, 0.990, 0.906, 0.992, 0, 0]
+
+#     test cer
+
+#     test wer
+
+    make_barplots(er, mer, fer, 'CER', 0, 0.5, 'cer.png')
