@@ -28,8 +28,6 @@ def main(args):
                    'dev': 'test_dev93/spk2gender',
                    'test': 'test_eval92/spk2gender'}
 
-    args.bucket_load_dir = 'buckets/5050'
-
     utils.safe_copytree(args.data_root, args.temp_root)
     if not os.path.exists(args.model_dir):
         os.makedirs(args.model_dir)
@@ -57,7 +55,6 @@ def train(args, jsons, spk2genders):
     dev_set, bucket_dev_loader = make_dataset_dataloader(args, jsons,
                                                          spk2genders,
                                                          split='dev')
-
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
@@ -172,12 +169,11 @@ def evaluate(args, jsons, spk2genders):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
-    evaluate_split(args, jsons, spk2genders, model, split='train')
-    evaluate_split(args, jsons, spk2genders, model, split='dev')
     if args.test:
         evaluate_split(args, jsons, spk2genders, model, split='test')
-
-
+    else:
+        evaluate_split(args, jsons, spk2genders, model, split='train')
+        evaluate_split(args, jsons, spk2genders, model, split='dev')
 
 def make_dataset_dataloader(args, jsons, spk2genders, split='train'):
     if split == 'train':
