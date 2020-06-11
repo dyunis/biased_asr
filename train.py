@@ -58,6 +58,7 @@ def train(args, jsons, spk2genders):
                                                          spk2genders,
                                                          split='dev')
 
+
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     model = models.LSTM(num_layers=args.n_layers, hidden_dim=args.hidden_dim,
