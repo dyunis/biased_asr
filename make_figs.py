@@ -4,11 +4,13 @@ import glob
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+from sklearn.manifold import TSNE
 
 import models
 import dataset
 import gender_subset
 import decoder
+import models_gender
 
 def get_preds_v_labels(datadir, expdir, save_file):
     model = models.LSTM(num_layers=3, hidden_dim=512, bidirectional=True)
@@ -79,6 +81,61 @@ def get_preds_v_labels(datadir, expdir, save_file):
                 f.write('\n')
             f.write('\n')
 
+def make_tsne(datadir, expdir, save_file, title, adversarial=False, 
+               test=False):
+    if adversarial:
+        model = models_gender.LSTM_gender(num_layers=3)
+    else:
+        model = models.LSTM(num_layers=3)
+
+    model_file = os.path.join(expdir, 'best.pt')
+    model.load_state_dict(torch.load(model_file))
+
+    if test:
+        split='eval92'
+    else:
+        split='dev93'
+
+    gender_dataset = gender_subset.ESPnetGenderBucketDataset(
+                         os.path.join(datadir, 
+                                      f'dump/test_{split}/deltafalse/data.json'),
+                         os.path.join(datadir,
+                                      'lang_1char/train_si284_units.txt'),
+                         os.path.join(datadir,
+                                      f'test_{split}/spk2gender'),
+                         num_buckets=10)
+
+#     since pushkar uses whole sequence to predict gender, and that's too much to
+#     keep in memory, take a mean over all frame outputs from the model
+    embeds = np.zeros((len(gender_dataset), 1024))
+    genders = np.zeros(len(gender_dataset), dtype=np.int)
+    for i in range(len(gender_dataset)):
+        data = gender_dataset[i]
+        feat = data['feat'].copy()[None, ...]
+
+        if adversarial:
+            y, gen_y, embed = model(torch.tensor(feat))
+        else:
+            _, embed = model(torch.tensor(feat))
+
+        embed = embed.detach().numpy()[0]
+        embeds[i, :] = np.mean(embed, axis=0)
+
+        utt = data['utt_id']
+        genders[i] = 0 if gender_dataset.utt2gender[utt] == 'f' else 1
+
+    tsne = TSNE(n_components=2, metric='cosine')
+    tsne_embeds = tsne.fit_transform(embeds)
+
+    f = tsne_embeds[genders == 0, :]
+    m = tsne_embeds[genders == 1, :]
+    plt.scatter(f[:, 0], f[:, 1], label='Female')
+    plt.scatter(m[:, 0], m[:, 1], label='Male')
+    plt.legend()
+    plt.title(f't-SNE of Female and Male embeddings for {title}')
+    plt.savefig(save_file)
+    plt.clf()
+
 def make_barplots(er, fer, mer, ylabel, ymin, ymax, save_file):
     n_groups = 10
 
@@ -126,5 +183,8 @@ if __name__=='__main__':
 
     datadir = '/scratch/asr_tmp/'
     expdir = '/scratch/asr_tmp/exps/2080_1e-4'
-    save_file = 'model_preds.txt'
-    get_preds_v_labels(datadir, expdir, save_file)
+#     save_file = 'model_preds.txt'
+#     get_preds_v_labels(datadir, expdir, save_file)
+    
+    make_tsne(datadir, '/scratch/asr_tmp/exps/5050_1e-4', 'tsne_5050.png',
+              '50/50 dataset', test=True)
