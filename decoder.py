@@ -76,10 +76,10 @@ def compute_cer_wer(log_probs, label, idx2tok):
 
 def levenshtein(pred, label):
     d = np.zeros((len(pred) + 1, len(label) + 1), dtype=np.int)
-    for i in range(1, d.shape[0]):
+    for i in range(d.shape[0]):
         d[i, 0] = i
 
-    for j in range(1, d.shape[1]):
+    for j in range(d.shape[1]):
         d[0, j] = j
 
     for i in range(1, d.shape[0]):
@@ -97,21 +97,24 @@ if __name__=='__main__':
     print(greedy_ctc_decode(a))
     a = np.array([[1, 2, 3], [3, 2, 1], [1, 2, 3]])
     a = a[None, ...]
-    print(batch_greedy_ctc_decode(a))
+    decoded, to_rm = batch_greedy_ctc_decode(a)
+    print(decoded[decoded != to_rm])
 
     a = np.array([[3, 2, 1], [3, 2, 1], [1, 2, 3]])
     print(greedy_ctc_decode(a))
     a = np.array([[3, 2, 1], [3, 2, 1], [1, 2, 3]])
     a = a[None, ...]
-    print(batch_greedy_ctc_decode(a))
+    decoded, to_rm = batch_greedy_ctc_decode(a)
+    print(decoded[decoded != to_rm])
 
     a = np.array([[1, 2, 3], [1, 2, 3], [1, 2, 3]])
     print(greedy_ctc_decode(a))
     a = np.array([[1, 2, 3], [1, 2, 3], [1, 2, 3]])
     a = a[None, ...]
-    print(batch_greedy_ctc_decode(a))
+    decoded, to_rm = batch_greedy_ctc_decode(a)
+    print(decoded[decoded != to_rm])
 
-    pred = ['o', 'this', 'this']
+    pred = ['o', 'this', 'is']
     label = ['this', 'is']
     print(levenshtein(pred, label))
     
