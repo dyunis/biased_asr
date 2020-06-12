@@ -52,16 +52,19 @@ def compute_spk_mean_std(dataset, save_file=None):
     spk2count = {}
     spk2sum = {}
     spk2sqsum = {}
-    for sample in tqdm.tqdm(dataset):
-        spk, feat = sample['utt_id'][:3], sample['feat']
-        if spk not in spk2sum.keys():
-            spk2count[spk] = feat.shape[0]
-            spk2sum[spk] = np.sum(feat, axis=0)
-            spk2sqsum[spk] = np.sum(feat ** 2, axis=0)
-        else:
-            spk2count[spk] += feat.shape[0]
-            spk2sum[spk] += np.sum(feat, axis=0)
-            spk2sqsum[spk] += np.sum(feat ** 2, axis=0)
+    for bucket in dataset.buckets.keys():
+        for utt in tqdm.tqdm(dataset.buckets[bucket]):
+            idx = dataset.utt2idx[utt]
+            feat = dataset[idx]['feat']
+            spk = utt[:3]
+            if spk not in spk2sum.keys():
+                spk2count[spk] = feat.shape[0]
+                spk2sum[spk] = np.sum(feat, axis=0)
+                spk2sqsum[spk] = np.sum(feat ** 2, axis=0)
+            else:
+                spk2count[spk] += feat.shape[0]
+                spk2sum[spk] += np.sum(feat, axis=0)
+                spk2sqsum[spk] += np.sum(feat ** 2, axis=0)
 
     spk2meanstd = {}
     for spk in spk2sum.keys():
@@ -79,18 +82,20 @@ def compute_gender_mean_std(dataset, save_file=None):
     gender2count = {}
     gender2sum = {}
     gender2sqsum = {}
-    for sample in tqdm.tqdm(dataset):
-        utt, feat = sample['utt_id'], sample['feat']
-        gender = dataset.utt2gender[utt]
-        if gender not in gender2count.keys():
-            gender2count[gender] = feat.shape[0]
-            gender2sum[gender] = np.sum(feat, axis=0)
-            gender2sqsum[gender] = np.sum(feat ** 2, axis=0)
-        else:
-            gender2count[gender] += feat.shape[0]
-            gender2sum[gender] += np.sum(feat, axis=0)
-            gender2sqsum[gender] += np.sum(feat ** 2, axis=0)
-
+    for bucket in tqdm.tqdm(dataset.buckets.keys()):
+        for utt in dataset.buckets[bucket]:
+            idx = dataset.utt2idx[utt]
+            feat = dataset[idx]['feat']
+            gender = dataset.utt2gender[utt]
+            if gender not in gender2count.keys():
+                gender2count[gender] = feat.shape[0]
+                gender2sum[gender] = np.sum(feat, axis=0)
+                gender2sqsum[gender] = np.sum(feat ** 2, axis=0)
+            else:
+                gender2count[gender] += feat.shape[0]
+                gender2sum[gender] += np.sum(feat, axis=0)
+                gender2sqsum[gender] += np.sum(feat ** 2, axis=0)
+                
     gender2meanstd = {}
     for gender in gender2count.keys():
         mean = gender2sum[gender] / gender2count[gender]

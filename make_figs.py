@@ -190,5 +190,5 @@ if __name__=='__main__':
 #     save_file = 'model_preds.txt'
 #     make_preds_labels(datadir, expdir, save_file)
     
-    make_tsne(datadir, '/scratch/asr_tmp/exps/5050_1e-4', 'tsne_5050.png',
-              '50/50 dataset', test=True)
+    make_tsne(datadir, '/scratch/asr_tmp/exps/2080_1e-4', 'tsne_2080.png',
+              '20/80 dataset', test=True)
