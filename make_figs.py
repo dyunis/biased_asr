@@ -12,7 +12,7 @@ import gender_subset
 import decoder
 import models_gender
 
-def get_preds_v_labels(datadir, expdir, save_file):
+def make_preds_labels(datadir, expdir, save_file):
     model = models.LSTM(num_layers=3, hidden_dim=512, bidirectional=True)
 
     wts = glob.glob(os.path.join(expdir, '*.pt'))
@@ -131,8 +131,12 @@ def make_tsne(datadir, expdir, save_file, title, adversarial=False,
     m = tsne_embeds[genders == 1, :]
     plt.scatter(f[:, 0], f[:, 1], label='Female')
     plt.scatter(m[:, 0], m[:, 1], label='Male')
+
     plt.legend()
     plt.title(f't-SNE of Female and Male embeddings for {title}')
+
+    plt.axis('off')
+    plt.tight_layout()
     plt.savefig(save_file)
     plt.clf()
 
@@ -184,7 +188,7 @@ if __name__=='__main__':
     datadir = '/scratch/asr_tmp/'
     expdir = '/scratch/asr_tmp/exps/2080_1e-4'
 #     save_file = 'model_preds.txt'
-#     get_preds_v_labels(datadir, expdir, save_file)
+#     make_preds_labels(datadir, expdir, save_file)
     
     make_tsne(datadir, '/scratch/asr_tmp/exps/5050_1e-4', 'tsne_5050.png',
               '50/50 dataset', test=True)
