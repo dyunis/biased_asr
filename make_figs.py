@@ -82,7 +82,7 @@ def make_preds_labels(datadir, expdir, save_file):
             f.write('\n')
 
 def make_tsne(datadir, expdir, save_file, title, adversarial=False, 
-               test=False):
+               test=False, mean=True):
     if adversarial:
         model = models_gender.LSTM_gender(num_layers=3)
     else:
@@ -119,7 +119,10 @@ def make_tsne(datadir, expdir, save_file, title, adversarial=False,
             _, embed = model(torch.tensor(feat))
 
         embed = embed.detach().numpy()[0]
-        embeds[i, :] = np.mean(embed, axis=0)
+        if mean:
+            embeds[i, :] = np.mean(embed, axis=0)
+        else:
+            embeds[i, :] = embed[-1, :]
 
         utt = data['utt_id']
         genders[i] = 0 if gender_dataset.utt2gender[utt] == 'f' else 1
@@ -132,7 +135,7 @@ def make_tsne(datadir, expdir, save_file, title, adversarial=False,
     plt.scatter(f[:, 0], f[:, 1], label='Female')
     plt.scatter(m[:, 0], m[:, 1], label='Male')
 
-    plt.legend()
+    plt.legend(loc='upper right')
     plt.title(f't-SNE of Female and Male embeddings for {title}')
 
     plt.axis('off')
@@ -140,25 +143,25 @@ def make_tsne(datadir, expdir, save_file, title, adversarial=False,
     plt.savefig(save_file)
     plt.clf()
 
-def make_barplots(er, fer, mer, ylabel, ymin, ymax, save_file):
+def make_barplots(er, fer, mer, ylabel, ymin, ymax, inc, save_file):
     n_groups = 10
 
     fig, ax = plt.subplots()
     index = np.arange(n_groups)
     bar_width = 0.22
 
-    rects = plt.bar(index, er, bar_width, label='Combined')
-    rects_f = plt.bar(index + bar_width, fer, bar_width, label='Female')
-    rects_m = plt.bar(index + 2*bar_width, mer, bar_width, label='Male')
+    rects = plt.bar(index, fer, bar_width, label='Female')
+    rects_f = plt.bar(index + bar_width, mer, bar_width, label='Male')
+    rects_m = plt.bar(index + 2*bar_width, er, bar_width, label='Combined')
 
     plt.ylabel(ylabel)
     plt.ylim(ymin, ymax)
-    plt.yticks(np.arange(ymin, ymax, 0.05))
+    plt.yticks(np.arange(ymin, ymax, inc))
 
     plt.xlabel('Experiment')
     xlabels = ['50/50', '20/80', '50/50 utt', '20/80 utt', '50/50 spk',
-               '20/80 spk', '50/50 gndr', '20/80 gndr', '50/50 discrim',
-               '20/80 discrim']
+               '20/80 spk', '50/50 gndr', '20/80 gndr', '50/50 adv',
+               '20/80 adv']
     plt.xticks(index + bar_width, xlabels, rotation=45)
 
     plt.title(f'{ylabel} by experiment and gender')
@@ -170,25 +173,61 @@ def make_barplots(er, fer, mer, ylabel, ymin, ymax, save_file):
 
 if __name__=='__main__':
 #     dev cer 
-    er = [0.389, 0.491, 0.392, 0.476, 0.387, 0.463, 0.393, 0.486, 0, 0]
-    mer = [0.377, 0.482, 0.373, 0.462, 0.370, 0.453, 0.378, 0.473, 0, 0]
-    fer = [0.401, 0.501, 0.412, 0.491, 0.406, 0.473, 0.408, 0.498, 0, 0] 
+    dcer = [0.409, 0.388, 0.380, 0.536, 0.429, 0.404, 0.405, 0.523, 0.368, 0.452]
+    dcfer = [0.400, 0.394, 0.363, 0.536, 0.413, 0.416, 0.390, 0.524, 0.361, 0.444]
+    dcmer = [0.419, 0.381, 0.397, 0.536, 0.445, 0.391, 0.422, 0.522, 0.375, 0.461]
 
 #     dev wer
-#     er = [0.900, 0.996, 0.933, 0.979, 0.916, 0.991, 0.899, 1.012, 0, 0]
-#     fer = [0.896, 1.007, 0.920, 0.972, 0.903, 0.992, 0.894, 1.031, 0, 0]
-#     mer = [0.905, 0.984, 0.946, 0.985, 0.930, 0.990, 0.906, 0.992, 0, 0]
+    dwer = [0.975, 0.915, 0.888, 1.048, 0.933, 0.892, 0.938, 0.969, 0.884, 0.950]
+    dwfer = [0.969, 0.929, 0.886, 1.056, 0.931, 0.897, 0.941, 0.974, 0.870, 0.957]
+    dwmer = [0.981, 0.900, 0.900, 1.039, 0.935, 0.886, 0.934, 0.963, 0.899, 0.944]
 
 #     test cer
+    tcer = [0.384, 0.358, 0.380, 0.529, 0.450, 0.407, 0.376, 0.504, 0.332, 0.432]
+    tcfer = [0.394, 0.384, 0.376, 0.537, 0.436, 0.427, 0.378, 0.535, 0.348, 0.446]
+    tcmer = [0.378, 0.342, 0.382, 0.525, 0.458, 0.396, 0.375, 0.487, 0.323, 0.423]
 
 #     test wer
+    twer = [0.964, 0.892, 0.905, 1.118, 0.959, 0.909, 0.922, 0.967, 0.853, 0.945]
+    twfer = [0.971, 0.900, 0.890, 1.086, 0.942, 0.915, 0.918, 0.966, 0.853, 0.944]
+    twmer = [0.960, 0.887, 0.914, 1.137, 0.969, 0.906, 0.924, 0.968, 0.853, 0.946]
 
-#     make_barplots(er, mer, fer, 'CER', 0, 0.55, 'cer.png')
+#     make_barplots(dcer, dcfer, dcmer, 'Development CER', 0, 0.55, 0.05, 'figs/dev_cer.png')
+#     make_barplots(dwer, dwfer, dwmer, 'Development WER', 0.85, 1.06, 0.02, 'figs/dev_wer.png')
+#     make_barplots(tcer, tcfer, tcmer, 'Test CER', 0, 0.55, 0.05, 'figs/test_cer.png')
+#     make_barplots(twer, twfer, twmer, 'Test WER', 0.84, 1.15, 0.02, 'figs/test_wer.png')
 
     datadir = '/scratch/asr_tmp/'
-    expdir = '/scratch/asr_tmp/exps/2080_1e-4'
+    expdir = '/share/data/speech/Data/dyunis/exps/speech_class/5050_1e-4'
 #     save_file = 'model_preds.txt'
 #     make_preds_labels(datadir, expdir, save_file)
+
+#     expdirs = glob.glob('/share/data/speech/Data/dyunis/exps/speech_class/*')
+    expdirs = ['5050_1e-4', '2080_1e-4', '5050_1e4_gender_mepoch45', '2080_1e4_gender_mepoch45']
+    expdirs = [os.path.join('/share/data/speech/Data/dyunis/exps/speech_class', path) for path in expdirs]
     
-    make_tsne(datadir, '/scratch/asr_tmp/exps/2080_1e-4', 'tsne_2080.png',
-              '20/80 dataset', test=True)
+    dset = ''
+    adv = ''
+    fn_adv = ''
+    fn_dset = ''
+    for expdir in expdirs:
+        if '5050' in expdir:
+            dset = '50/50'
+            fn_dset = '5050'
+        else:
+            dset = '20/80'
+            fn_dset = '2080'
+        
+        if 'mepoch' in expdir:
+            adv = ' (adversarial)'
+            fn_adv = '_adv'
+            adversarial = True
+        else:
+            adv = ''
+            fn_adv = ''
+            adversarial = False
+
+        make_tsne(datadir, expdir, f'figs/tsne_{fn_dset}{fn_adv}_mean.png',
+              f'{dset} dataset{adv}', test=True, adversarial=adversarial)
+        make_tsne(datadir, expdir, f'figs/tsne_{fn_dset}{fn_adv}_last.png',
+              f'{dset} dataset{adv}', test=True, mean=False, adversarial=adversarial)

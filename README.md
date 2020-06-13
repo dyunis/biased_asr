@@ -1,18 +1,34 @@
 ## Investigating bias in ASR
 
+TTIC Speech Technologies course project 2020
+David Yunis and Pushkar Shukla
+
+### Dependencies:
+This code tested on `python 3.8.1` with the following external packages:
+```
+torch 1.5.0
+numpy 1.18.1
+kaldiio 2.15.1
+scikit-learn 0.22.2
+matplotlib 3.1.3
+```
+
 ### Files:
-- `train.py`: the main training loop (and a skeleton for test-set evaluation)
-  - currently encountering NaNs with full WSJ training, but I want to finish 
-    coding our subsampled dataset first
+- `train.py`: the main training loop and evaluation
+- `train_gender.py`: gender discriminator experiments
 - `dataset.py`: the file with all the torch datasets and samplers, I'm using 
   a json from a package called ESPnet that does all the kaldi preprocessing (of
   transcripts and for filterbanks from wav files)
 - `models.py`: models for ASR, right now it's just an LSTM
+- `models_gender.py`: LSTM and gender discriminator
 - `decoder.py`: a greedy decoder taking in the log probabilities of a sequence
   and outputting the most probable indices
 - `gender_subset.py`: the file for taking WSJ and producing a dataset with 
-  certain fractions of gender data, but this data is already generated in the
-  dataset directory
+  certain fractions of gender data, this data already exists in the dataset
+  directory
+- `transforms.py`: a file for the normalizations
+- `exps{1,2,3}.sh`: scripts for running experiments
+- `make_figs.py`: code for all the plots in the report
 - `utils.py`: some small tools I use for debugging and optimizing, kinda 
   irrelevant
 
@@ -24,37 +40,18 @@ already with `safe_cptree`)
 see `main()` in `train.py` for more path info
 
 the balanced and imbalanced datasets are inside the WSJ directory at 
-`buckets/5050`, `buckets/8020` and `buckets/2080`, where the first number is 
+`buckets/5050` and `buckets/2080`, where the first number is 
 the proportion of female speakers, and the second is the proportion of male
 
-### TODO:
-- David:
-  - [x] finish up dataset splitting code (in `gender_subset.py`)
-  - [x] code up WER evaluation (in `decoder.py`)
-  - [x] normalizations (as transforms in `transforms.py`)
-  - [x] avg WER evaluation per gender
-  - [x] logging and plotting for each experiment to record loss, CER, and WER
-  - [ ] automatic resuming of experiments based on last model in `model_dir`
-  - [ ] slurm timeouts (chip did 3.7 hrs always)
-  - [ ] give pushkar `.sh` file to run all the experiments
-- Pushkar:
-  - adversarial regularizer (ideally in `models.py`, take a look at the training
-    code in `train.py` and `dataset.py`)
+### Running the code
 
-### Experiment list:
-- no normalization:
-  - 50/50 dataset
-  - 80/20 dataset
-- utterance normalization:
-  - 50/50 dataset
-  - 80/20 dataset
-- speaker normalization:
-  - 50/50 dataset
-  - 80/20 dataset
-- gender normalization:
-  - 50/50 dataset
-  - 80/20 dataset
-- adversarial regularizer:
-  - 50/50 dataset
-  - 80/20 dataset
+```
+python train.py --bucket_load_dir buckets/5050 --model_dir=./models
+```
+should be all it takes to run the code (for the speech group), it will save 
+all models and outputs in a directory called `models`.
 
+### Disclaimer
+
+Providing this code as is, but it is not the cleanest, and I can't really take
+responsibility for its state right now.

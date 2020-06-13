@@ -14,6 +14,7 @@ import utils
 import models
 import gender_subset
 import transforms
+import models_gender
 
 # TODO:
 # automatic resuming of experiments based on last model file in model_dir
@@ -159,7 +160,11 @@ def make_epoch_plot(x, x_name, save_file):
 
 # TODO: look at shubham's paper and kaldi 4-gram for language model integration
 def evaluate(args, jsons, spk2genders):
-    model = models.LSTM(num_layers=args.n_layers, hidden_dim=args.hidden_dim,
+    if args.adversarial:
+        model=models_gender.LSTM_gender(num_layers=args.n_layers, hidden_dim=args.hidden_dim,
+                                 bidirectional=args.bidir)
+    else:
+        model = models.LSTM(num_layers=args.n_layers, hidden_dim=args.hidden_dim,
                         bidirectional=args.bidir)
 
     model.load_state_dict(torch.load(os.path.join(args.temp_root, 
@@ -219,7 +224,8 @@ def evaluate_split(args, jsons, spk2genders, model, split='train'):
                                                                 spk2genders,
                                                                 split=split)
 
-    stats = evaluate_dataset(model, gender_dataset, gender_dataloader)
+    stats = evaluate_dataset(model, gender_dataset, gender_dataloader,
+                             adversarial=args.adversarial)
     
     logging.info(f'Final results on {split}')
     logging.info('----')
@@ -227,11 +233,15 @@ def evaluate_split(args, jsons, spk2genders, model, split='train'):
         logging.info(f'{key}: {stats[key]}')
     logging.info('\n')
 
-def evaluate_dataset(model, gender_dataset, gender_dataloader):
+def evaluate_dataset(model, gender_dataset, gender_dataloader,
+                     adversarial=False):
     cer, wer, m_cer, m_wer, f_cer, f_wer = [], [], [], [], [], []
     model.eval()
     for data in tqdm.tqdm(gender_dataloader):
-        log_probs, embed = model(data['feat'].cuda())
+        if adversarial:
+            log_probs, g_log_probs, embed = model(data['feat'].cuda())
+        else:
+            log_probs, embed = model(data['feat'].cuda())
         log_probs = log_probs.cpu().detach().numpy()
         labels = data['label'].cpu().detach().numpy()
 
@@ -377,6 +387,10 @@ if __name__=='__main__':
                         type=str,
                         help='type of normalization [utt, spk, gndr] to use',
                         default=None)
+    parser.add_argument('--adversarial',
+                        default=False,
+                        action='store_true',
+                        help='use adversarially trained model')
 
     args = parser.parse_args()
     main(args)
