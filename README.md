@@ -50,8 +50,3 @@ python train.py --bucket_load_dir buckets/5050 --model_dir=./models
 ```
 should be all it takes to run the code (for the speech group), it will save 
 all models and outputs in a directory called `models`.
-
-### Disclaimer
-
-Providing this code as is, but it is not the cleanest, and I can't really take
-responsibility for its state right now.
